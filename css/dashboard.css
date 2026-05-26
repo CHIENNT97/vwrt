@@ -2,36 +2,42 @@
    1. VARIABLES & THEME
    ========================================= */
 :root {
-  --bg-body: #f0f2f5;
-  --bg-card: #ffffff;
-  --text-main: #2d3748;
-  --text-sub: #718096;
-  --border-color: #e2e8f0;
-  --hover-bg: #ebf8ff;
-  --icon-bg: #f7fafc;
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-  --sidebar-bg: #ffffff;
+  --bg-body: radial-gradient(circle at 50% 50%, #f4f7f6 0%, #e5e9f0 100%);
+  --bg-body-image: linear-gradient(rgba(49, 130, 206, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(49, 130, 206, 0.03) 1px, transparent 1px);
+  --bg-body-size: 20px 20px;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --text-main: #1a202c;
+  --text-sub: #4a5568;
+  --border-color: rgba(49, 130, 206, 0.15);
+  --hover-bg: rgba(66, 153, 225, 0.15);
+  --icon-bg: rgba(247, 250, 252, 0.8);
+  --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+  --sidebar-bg: rgba(255, 255, 255, 0.9);
   --accent-color: #3182ce;
   --tag-green-bg: rgba(56, 161, 105, 0.15);
   --tag-green-text: #2f855a;
   --tag-blue-bg: rgba(49, 130, 206, 0.15);
   --tag-blue-text: #2c5282;
+  --card-blur: blur(12px);
 }
 [data-theme="dark"] {
-  --bg-body: #1a202c;
-  --bg-card: #2d3748;
-  --text-main: #f7fafc;
-  --text-sub: #a0aec0;
-  --border-color: #4a5568;
-  --hover-bg: #2b6cb0;
-  --icon-bg: #4a5568;
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  --sidebar-bg: #2d3748;
-  --accent-color: #63b3ed;
-  --tag-green-bg: rgba(72, 187, 120, 0.2);
-  --tag-green-text: #68d391;
-  --tag-blue-bg: rgba(66, 153, 225, 0.2);
-  --tag-blue-text: #63b3ed;
+  --bg-body: radial-gradient(circle at 50% 50%, #0d111d 0%, #07090e 100%);
+  --bg-body-image: linear-gradient(rgba(0, 242, 254, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 242, 254, 0.03) 1px, transparent 1px);
+  --bg-body-size: 24px 24px;
+  --bg-card: rgba(13, 20, 35, 0.7);
+  --text-main: #e2e8f0;
+  --text-sub: #94a3b8;
+  --border-color: rgba(0, 242, 254, 0.15);
+  --hover-bg: rgba(0, 242, 254, 0.2);
+  --icon-bg: rgba(30, 41, 59, 0.8);
+  --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --sidebar-bg: rgba(13, 20, 35, 0.85);
+  --accent-color: #00f2fe;
+  --tag-green-bg: rgba(0, 230, 118, 0.15);
+  --tag-green-text: #00e676;
+  --tag-blue-bg: rgba(0, 242, 254, 0.15);
+  --tag-blue-text: #00f2fe;
+  --card-blur: blur(16px);
 }
 
 /* =========================================
@@ -45,6 +51,8 @@
 }
 body {
   background: var(--bg-body);
+  background-image: var(--bg-body-image);
+  background-size: var(--bg-body-size);
   height: 100vh;
   overflow: hidden;
   color: var(--text-main);
@@ -305,6 +313,9 @@ body {
 
 .card {
   background: var(--bg-card);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  border: 1px solid var(--border-color);
   border-radius: 20px;
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -312,6 +323,12 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px 0 rgba(0, 242, 254, 0.1);
+  border-color: rgba(0, 242, 254, 0.3);
 }
 
 .card-header-compact {
