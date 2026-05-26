@@ -2,7 +2,7 @@
 
 local cjson = require "cjson"
 -- Add project root to package path
-package.path = "/www/vwrt/?.lua;" .. package.path
+package.path = "/www/NTC_WRT/?.lua;" .. package.path
 
 local constants = require "lib.constants"
 local CACHE_FILE = constants.PATHS.MOBILE_CACHE
@@ -48,14 +48,14 @@ function exec(cmd)
 end
 
 function log(msg)
-    os.execute("logger -t VWRT_POLLER '" .. tostring(msg) .. "'")
+    os.execute("logger -t NTC_WRT_POLLER '" .. tostring(msg) .. "'")
 end
 
 function exec_at_tty(device, cmd)
     if not cmd or cmd == "" then return nil end
     
     -- Use shell script to execute AT command
-    local sh = string.format("/www/vwrt/services/at_cmd.sh %s '%s' 2>/dev/null", device, cmd)
+    local sh = string.format("/www/NTC_WRT/services/at_cmd.sh %s '%s' 2>/dev/null", device, cmd)
     return exec(sh)
 end
 
@@ -341,7 +341,7 @@ local function calculate_signal_strength(rssi)
 end
 
 local function apply_auto_led(mode, ping, iface, state)
-    local config_file = "/etc/vwrt_autoled.json"
+    local config_file = "/etc/NTC_WRT_autoled.json"
     local f = io.open(config_file, "r")
     if not f then return end
     local content = f:read("*all")
@@ -385,7 +385,7 @@ local function apply_auto_led(mode, ping, iface, state)
     end
 
     -- DEBUG LOG
-    os.execute("logger -t VWRT_LED 'Status: " .. current_status .. " | Ping: " .. tostring(ping) .. " | Mode: " .. tostring(mode) .. " | Iface: " .. tostring(iface) .. "'")
+    os.execute("logger -t NTC_WRT_LED 'Status: " .. current_status .. " | Ping: " .. tostring(ping) .. " | Mode: " .. tostring(mode) .. " | Iface: " .. tostring(iface) .. "'")
 
     -- Helper function to check if LED should be active
     local function is_led_active(led_name)
@@ -522,7 +522,7 @@ local function check_and_fix_modem_config()
     if not dev_valid then
         local detected = find_modem_device()
         if detected then
-            os.execute("logger -t VWRT_POLLER 'Invalid/Missing device config (" .. current_dev .. "). Auto-fixing to: " .. detected .. "'")
+            os.execute("logger -t NTC_WRT_POLLER 'Invalid/Missing device config (" .. current_dev .. "). Auto-fixing to: " .. detected .. "'")
             os.execute("uci set network.5G.device='" .. detected .. "' && uci commit network && /etc/init.d/network reload")
             -- Wait for network to settle
             os.execute("sleep 5")
@@ -675,7 +675,7 @@ local last_good_signal = {
 function main()
     -- Restore LED Config
     local function restore_leds() 
-        local f = io.open("/etc/vwrt_led.json", "r")
+        local f = io.open("/etc/NTC_WRT_led.json", "r")
         if f then
             local content = f:read("*all")
             f:close()
@@ -754,7 +754,7 @@ function main()
                      -- Double check with longer timeout to avoid false positive
                      local retry = safe_execute("ping -c 1 -W 5 8.8.8.8 >/dev/null 2>&1")
                      if not retry then
-                          exec("logger -t VWRT_WATCHDOG 'Connection Lost confirmed. Restarting 5G interface...'")
+                          exec("logger -t NTC_WRT_WATCHDOG 'Connection Lost confirmed. Restarting 5G interface...'")
                           os.execute("ifdown 5G; sleep 2; ifup 5G")
                      end
                 end
@@ -792,7 +792,7 @@ function main()
                 if pending_start_time == 0 then
                     pending_start_time = os.time()
                 elseif os.time() - pending_start_time > 60 then
-                    os.execute("logger -t VWRT_POLLER 'Interface 5G stuck in PENDING state (>60s). Hard Resetting...'")
+                    os.execute("logger -t NTC_WRT_POLLER 'Interface 5G stuck in PENDING state (>60s). Hard Resetting...'")
                     
                     -- 1. Shutdown Interface (Frees the AT port)
                     os.execute("ifdown 5G")
@@ -801,7 +801,7 @@ function main()
                     -- 2. Force Modem Online (Safe now)
                     local port = get_fm350_port()
                     if acquire_lock() then
-                        os.execute("logger -t VWRT_POLLER 'Forcing Modem Online (CFUN=1) while interface is down...'")
+                        os.execute("logger -t NTC_WRT_POLLER 'Forcing Modem Online (CFUN=1) while interface is down...'")
                         exec_at_tty(port, "AT+CFUN=1")
                         release_lock()
                     end
@@ -1051,7 +1051,7 @@ function main()
                         -- Check and enforce CFUN=1 (Standard maintenance)
                         local cfun_state = exec_at_tty(port, "AT+CFUN?")
                         if cfun_state and (cfun_state:find("CFUN: 0") or cfun_state:find("CFUN: 4")) then
-                             os.execute("logger -t VWRT_POLLER 'Modem in Low Power Mode. Forcing Online (CFUN=1)...'")
+                             os.execute("logger -t NTC_WRT_POLLER 'Modem in Low Power Mode. Forcing Online (CFUN=1)...'")
                              exec_at_tty(port, "AT+CFUN=1")
                              os.execute("sleep 2")
                         end
@@ -1250,7 +1250,7 @@ function main()
             end
         end)
         if not status then
-            os.execute("logger -t VWRT_POLLER_ERR 'Loop Error: " .. tostring(err):gsub("'", "") .. "'")
+            os.execute("logger -t NTC_WRT_POLLER_ERR 'Loop Error: " .. tostring(err):gsub("'", "") .. "'")
         end
         end
         

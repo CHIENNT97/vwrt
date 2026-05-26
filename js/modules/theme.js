@@ -1,6 +1,6 @@
 const ThemeModule = {
     init: function() {
-        const savedTheme = localStorage.getItem('vwrt_theme') || 'light';
+        const savedTheme = localStorage.getItem('NTC_WRT_theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
         
         this.updateIcon(savedTheme);
@@ -17,7 +17,7 @@ const ThemeModule = {
         
         document.documentElement.setAttribute('data-theme', next);
         
-        localStorage.setItem('vwrt_theme', next);
+        localStorage.setItem('NTC_WRT_theme', next);
         
         this.updateIcon(next);
     },

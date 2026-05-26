@@ -281,14 +281,14 @@ openEditModal: function(dataStr) {
 
         // Prepare Payload with CSRF
         const payload = { section, device, ssid, key, channel, htmode, enabled };
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            payload.csrf_token = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            payload.csrf_token = NTC_WRT_API.csrfToken;
         }
 
         // Prepare Headers with CSRF
         const headers = {'Content-Type': 'application/json'};
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            headers['X-CSRF-Token'] = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            headers['X-CSRF-Token'] = NTC_WRT_API.csrfToken;
         }
 
         fetch('/cgi-bin/wifi/set', {

@@ -1,12 +1,12 @@
-# 🚀 VWRT Dashboard System (VWRT Admin Panel)
+# 🚀 NTC_WRT Dashboard System (NTC_WRT Admin Panel)
 
 > **Hệ thống quản lý Router OpenWrt chuyên dụng, tối ưu hóa cho Modem 4G/5G.**
 
-![Version](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/vietter99/vwrtdashbroad/main/version.json&query=$.dashboard.version&label=version&color=blue)
+![Version](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/CHIENNT97/vwrt/main/version.json&query=$.dashboard.version&label=version&color=blue)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
 ![License](https://img.shields.io/badge/license-Vietter%20Exclusive-red.svg)
 
-<img width="100%" alt="VWRT Dashboard Preview" src="https://github.com/user-attachments/assets/05a261b4-a95b-4421-b388-cefa7a8c28fa" />
+<img width="100%" alt="NTC_WRT Dashboard Preview" src="https://github.com/user-attachments/assets/05a261b4-a95b-4421-b388-cefa7a8c28fa" />
 
 ---
 
@@ -20,7 +20,7 @@
 
 **🆘 HỖ TRỢ & GIẢI ĐÁP (Support) [Phạm Việt](https://www.facebook.com/pham.viet.853811)**
 
-**© 2025 VWRT. All rights reserved.**
+**© 2025 NTC_WRT. All rights reserved.**
 
 ---
 
@@ -33,7 +33,7 @@
 
 ## ✨ Tính Năng Nổi Bật (Features)
 
-Hệ thống VWRT Dashboard mang đến trải nghiệm quản lý Router hoàn toàn mới:
+Hệ thống NTC_WRT Dashboard mang đến trải nghiệm quản lý Router hoàn toàn mới:
 
 ### 1. 📊 Dashboard Trực Quan
 
@@ -60,15 +60,15 @@ Hệ thống VWRT Dashboard mang đến trải nghiệm quản lý Router hoàn 
 
 ## 🛠️ Hướng Dẫn Cài Đặt Qua SSH
 
-Bạn có thể dễ dàng cài đặt, cập nhật hoặc gỡ bỏ VWRT Dashboard bằng cách chạy lệnh duy nhất dưới đây qua SSH của Router:
+Bạn có thể dễ dàng cài đặt, cập nhật hoặc gỡ bỏ NTC_WRT Dashboard bằng cách chạy lệnh duy nhất dưới đây qua SSH của Router:
 
 ```sh
 wget -O /tmp/install.sh https://raw.githubusercontent.com/CHIENNT97/vwrt/main/install.sh && sh /tmp/install.sh
 ```
 
 **Màn hình quản lý sẽ hiện ra với các tùy chọn:**
-1. Install / Update VWRT Dashboard
-2. Uninstall VWRT Dashboard
+1. Install / Update NTC_WRT Dashboard
+2. Uninstall NTC_WRT Dashboard
 3. Cancel
 
 Chỉ cần nhập lựa chọn của bạn (1 hoặc 2) để tiến hành. Sau khi cài đặt hoàn tất, bạn có thể truy cập Dashboard tại: `http://192.168.88.1:2222/`

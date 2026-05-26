@@ -201,9 +201,9 @@ const RebootScheduleModule = {
         if(!silent && typeof Toast !== 'undefined') Toast.show("Đang lưu...", "info");
         
         // Fetch fresh CSRF Token
-        if(typeof VWRT_API !== 'undefined') {
-            VWRT_API.csrfToken = null;
-            await VWRT_API.fetchCSRFToken();
+        if(typeof NTC_WRT_API !== 'undefined') {
+            NTC_WRT_API.csrfToken = null;
+            await NTC_WRT_API.fetchCSRFToken();
         }
         
         this.doSubmit(payload, closeId, silent, retryCount);
@@ -211,8 +211,8 @@ const RebootScheduleModule = {
 
     doSubmit: function(payload, closeId, silent, retryCount) {
         // Add CSRF token into payload (uhttpd strips custom headers)
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            payload.csrf_token = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            payload.csrf_token = NTC_WRT_API.csrfToken;
         }
 
         fetch('/cgi-bin/reboot_schedule/set', {
@@ -233,9 +233,9 @@ const RebootScheduleModule = {
                 // CSRF Retry Logic
                 if (data.error && data.error.includes("CSRF") && retryCount < 1) {
 
-                    if(typeof VWRT_API !== 'undefined') {
-                        VWRT_API.csrfToken = null; // Clear bad token
-                        VWRT_API.fetchCSRFToken().then(() => {
+                    if(typeof NTC_WRT_API !== 'undefined') {
+                        NTC_WRT_API.csrfToken = null; // Clear bad token
+                        NTC_WRT_API.fetchCSRFToken().then(() => {
                             this.submit(payload, closeId, silent, retryCount + 1);
                         });
                     }

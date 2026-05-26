@@ -24,8 +24,8 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     };
 
     const handleSuccess = (user, sessionId) => {
-        localStorage.setItem('vwrt_session', sessionId);
-        localStorage.setItem('vwrt_user', user);
+        localStorage.setItem('ntc_wrt_session', sessionId);
+        localStorage.setItem('ntc_wrt_user', user);
         
         Toast.show(`Đăng nhập thành công (${user})!`, "success");
         btn.innerText = "Đang chuyển trang...";
@@ -73,7 +73,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
-    const savedUser = localStorage.getItem('vwrt_user');
+    const savedUser = localStorage.getItem('ntc_wrt_user');
     if (savedUser) {
         document.getElementById('username').value = savedUser;
     }

@@ -44,7 +44,7 @@ body {
     margin-bottom: 30px;
 }
 
-.logo-vwrt {
+.logo-NTC_WRT {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -56,7 +56,7 @@ body {
     transition: transform 0.3s ease;
 }
 
-.logo-vwrt:hover {
+.logo-NTC_WRT:hover {
     transform: scale(1.05);
 }
 

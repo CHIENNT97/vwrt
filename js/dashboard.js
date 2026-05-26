@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const session = localStorage.getItem('vwrt_session');
+    const session = localStorage.getItem('ntc_wrt_session');
     if (!session) { window.location.href = 'index.html'; return; }
 
     if(typeof HeaderModule !== 'undefined') {
@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if(typeof Modal !== 'undefined') {
                 Modal.confirm("Đăng xuất", "Bạn muốn thoát?", () => {
-                    localStorage.removeItem('vwrt_session');
-                    localStorage.removeItem('vwrt_user');
+                    localStorage.removeItem('ntc_wrt_session');
+                    localStorage.removeItem('ntc_wrt_user');
                     window.location.href = 'index.html';
                 });
             }

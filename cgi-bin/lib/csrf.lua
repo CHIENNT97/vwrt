@@ -1,4 +1,4 @@
--- CSRF Protection Module for VWRT Dashboard
+-- CSRF Protection Module for NTC_WRT Dashboard
 -- Chống tấn công Cross-Site Request Forgery
 
 local M = {}
@@ -29,7 +29,7 @@ end
 
 -- Store CSRF token in session file
 function M.save_token(token)
-    local session_file = "/tmp/vwrt_csrf_token"
+    local session_file = "/tmp/NTC_WRT_csrf_token"
     local f = io.open(session_file, "w")
     if f then
         f:write(token .. "\n" .. os.time())
@@ -41,7 +41,7 @@ end
 
 -- Get CSRF token from session
 function M.get_token()
-    local session_file = "/tmp/vwrt_csrf_token"
+    local session_file = "/tmp/NTC_WRT_csrf_token"
     local f = io.open(session_file, "r")
     if not f then
         -- Generate new token if not exists

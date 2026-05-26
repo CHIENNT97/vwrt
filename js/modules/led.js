@@ -235,9 +235,9 @@ const LedModule = {
         const payload = JSON.parse(JSON.stringify(config)); // clone
         const headers = { 'Content-Type': 'application/json' };
         
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            payload.csrf_token = VWRT_API.csrfToken;
-            headers['X-CSRF-Token'] = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            payload.csrf_token = NTC_WRT_API.csrfToken;
+            headers['X-CSRF-Token'] = NTC_WRT_API.csrfToken;
         }
 
         fetch('/cgi-bin/led/auto_set', {
@@ -259,9 +259,9 @@ const LedModule = {
         const payload = { name: name, brightness: brightness, trigger: trigger };
         const headers = { 'Content-Type': 'application/json' };
         
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            payload.csrf_token = VWRT_API.csrfToken;
-            headers['X-CSRF-Token'] = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            payload.csrf_token = NTC_WRT_API.csrfToken;
+            headers['X-CSRF-Token'] = NTC_WRT_API.csrfToken;
         }
 
         fetch('/cgi-bin/led/set', {

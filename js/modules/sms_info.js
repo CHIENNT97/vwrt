@@ -86,15 +86,15 @@ const SmsModule = {
             if (modal) modal.remove();
 
             const payload = { number: number, text: text };
-            if (typeof VWRT_API !== "undefined" && VWRT_API.csrfToken) {
-                payload.csrf_token = VWRT_API.csrfToken;
+            if (typeof NTC_WRT_API !== "undefined" && NTC_WRT_API.csrfToken) {
+                payload.csrf_token = NTC_WRT_API.csrfToken;
             }
 
             fetch("/cgi-bin/sms/send", {
                 method: "POST",
                 headers:
-                    typeof VWRT_API !== "undefined"
-                        ? VWRT_API.getHeaders()
+                    typeof NTC_WRT_API !== "undefined"
+                        ? NTC_WRT_API.getHeaders()
                         : { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             })
@@ -240,9 +240,9 @@ const SmsModule = {
 
                 const payload = { action: "delete", id: ids };
                 const headers = { "Content-Type": "application/json" };
-                if (typeof VWRT_API !== "undefined" && VWRT_API.csrfToken) {
-                    payload.csrf_token = VWRT_API.csrfToken;
-                    headers["X-CSRF-Token"] = VWRT_API.csrfToken;
+                if (typeof NTC_WRT_API !== "undefined" && NTC_WRT_API.csrfToken) {
+                    payload.csrf_token = NTC_WRT_API.csrfToken;
+                    headers["X-CSRF-Token"] = NTC_WRT_API.csrfToken;
                 }
 
                 fetch("/cgi-bin/sms/action", {

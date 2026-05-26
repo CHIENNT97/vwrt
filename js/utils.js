@@ -1,6 +1,6 @@
 /**
- * VWRT Security Utilities
- * Các hàm tiện ích bảo mật cho VWRT Dashboard
+ * NTC_WRT Security Utilities
+ * Các hàm tiện ích bảo mật cho NTC_WRT Dashboard
  */
 
 const Security = {

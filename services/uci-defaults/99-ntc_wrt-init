@@ -1,5 +1,5 @@
 #!/bin/sh
-# VWRT Services Auto-Enable Script
+# NTC_WRT Services Auto-Enable Script
 # This runs once on first boot or after factory reset
 
 /etc/init.d/mobile_poller enable

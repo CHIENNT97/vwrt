@@ -1,10 +1,10 @@
 #!/bin/sh
 
 echo "==================================================="
-echo "   VWRT Dashboard Manager (SSH)"
+echo "   NTC_WRT Dashboard Manager (SSH)"
 echo "==================================================="
-echo " 1. Install / Update VWRT Dashboard"
-echo " 2. Uninstall VWRT Dashboard"
+echo " 1. Install / Update NTC_WRT Dashboard"
+echo " 2. Uninstall NTC_WRT Dashboard"
 echo " 3. Cancel"
 echo "==================================================="
 printf "Please select an option (1-3): "
@@ -14,8 +14,8 @@ case $choice in
     1)
         echo "Starting Installation..."
         # Target directories
-        WORK_DIR="/tmp/vwrt_extract"
-        TAR_FILE="/tmp/vwrt_download.tar.gz"
+        WORK_DIR="/tmp/NTC_WRT_extract"
+        TAR_FILE="/tmp/NTC_WRT_download.tar.gz"
         REPO_URL="https://github.com/CHIENNT97/vwrt/archive/refs/heads/main.tar.gz"
 
         echo "Downloading source from GitHub..."
@@ -39,7 +39,7 @@ case $choice in
             exit 1
         fi
 
-        # Find source directory (resolves github branch subfolder name e.g. vwrt-main)
+        # Find source directory (resolves github branch subfolder name e.g. NTC_WRT-main)
         SOURCE_DIR=$(ls -d "$WORK_DIR"/*/ 2>/dev/null | head -n 1)
         if [ -z "$SOURCE_DIR" ]; then
             SOURCE_DIR="$WORK_DIR/"
@@ -51,27 +51,27 @@ case $choice in
         /etc/init.d/sms_sync stop 2>/dev/null
 
         echo "Installing Web files..."
-        mkdir -p /www/vwrt /www/cgi-bin
+        mkdir -p /www/NTC_WRT /www/cgi-bin
 
-        # Clean old vwrt dir
-        rm -rf /www/vwrt/*
+        # Clean old NTC_WRT dir
+        rm -rf /www/NTC_WRT/*
 
         # Copy new files
-        cp -rf "${SOURCE_DIR}"index.html /www/vwrt/
-        cp -rf "${SOURCE_DIR}"dashboard.html /www/vwrt/
-        cp -rf "${SOURCE_DIR}"version.json /www/vwrt/
-        cp -rf "${SOURCE_DIR}"css /www/vwrt/
-        cp -rf "${SOURCE_DIR}"js /www/vwrt/
-        cp -rf "${SOURCE_DIR}"lib /www/vwrt/
-        cp -rf "${SOURCE_DIR}"services /www/vwrt/
+        cp -rf "${SOURCE_DIR}"index.html /www/NTC_WRT/
+        cp -rf "${SOURCE_DIR}"dashboard.html /www/NTC_WRT/
+        cp -rf "${SOURCE_DIR}"version.json /www/NTC_WRT/
+        cp -rf "${SOURCE_DIR}"css /www/NTC_WRT/
+        cp -rf "${SOURCE_DIR}"js /www/NTC_WRT/
+        cp -rf "${SOURCE_DIR}"lib /www/NTC_WRT/
+        cp -rf "${SOURCE_DIR}"services /www/NTC_WRT/
 
         # Copy cgi-bin files to global cgi-bin
         cp -rf "${SOURCE_DIR}"cgi-bin/* /www/cgi-bin/ 2>/dev/null
 
         # Configure symbolic links
-        rm -rf /www/vwrt/cgi-bin
-        ln -snf /www/cgi-bin /www/vwrt/cgi-bin
-        ln -snf /www/luci-static /www/vwrt/luci-static
+        rm -rf /www/NTC_WRT/cgi-bin
+        ln -snf /www/cgi-bin /www/NTC_WRT/cgi-bin
+        ln -snf /www/luci-static /www/NTC_WRT/luci-static
 
         # Restore original LuCI from ROM if it exists and /www/cgi-bin/luci is a symlink loop
         if [ -L /www/cgi-bin/luci ] || [ ! -f /www/cgi-bin/luci ]; then
@@ -80,32 +80,32 @@ case $choice in
         fi
 
         # Copy system service init scripts
-        cp -f /www/vwrt/services/init.d/mobile_poller /etc/init.d/ 2>/dev/null
-        cp -f /www/vwrt/services/init.d/sms_sync /etc/init.d/ 2>/dev/null
+        cp -f /www/NTC_WRT/services/init.d/mobile_poller /etc/init.d/ 2>/dev/null
+        cp -f /www/NTC_WRT/services/init.d/sms_sync /etc/init.d/ 2>/dev/null
 
         # Clean up dev artifacts in destination
-        rm -rf /www/vwrt/.editorconfig /www/vwrt/.vscode /www/vwrt/.git* /www/vwrt/deploy_tool /www/vwrt/dist
+        rm -rf /www/NTC_WRT/.editorconfig /www/NTC_WRT/.vscode /www/NTC_WRT/.git* /www/NTC_WRT/deploy_tool /www/NTC_WRT/dist
 
         echo "Normalizing line endings (CRLF to LF)..."
-        sed -i 's/\r$//' /etc/init.d/mobile_poller /etc/init.d/sms_sync /www/vwrt/services/at_cmd.sh 2>/dev/null
-        find /www/vwrt/ -type f -name "*.sh" -o -name "*.lua" 2>/dev/null | xargs sed -i 's/\r$//' 2>/dev/null
+        sed -i 's/\r$//' /etc/init.d/mobile_poller /etc/init.d/sms_sync /www/NTC_WRT/services/at_cmd.sh 2>/dev/null
+        find /www/NTC_WRT/ -type f -name "*.sh" -o -name "*.lua" 2>/dev/null | xargs sed -i 's/\r$//' 2>/dev/null
         find /www/cgi-bin/ -type f 2>/dev/null | xargs sed -i 's/\r$//' 2>/dev/null
 
         echo "Setting permissions..."
-        chmod 755 /www/vwrt
+        chmod 755 /www/NTC_WRT
         chmod -R +x /www/cgi-bin/ 2>/dev/null
-        chmod -R +x /www/vwrt/services/ 2>/dev/null
+        chmod -R +x /www/NTC_WRT/services/ 2>/dev/null
         chmod +x /etc/init.d/mobile_poller /etc/init.d/sms_sync 2>/dev/null
 
         echo "Configuring uhttpd..."
-        uci delete uhttpd.vwrt 2>/dev/null
-        uci set uhttpd.vwrt=uhttpd
-        uci add_list uhttpd.vwrt.listen_http='0.0.0.0:2222'
-        uci add_list uhttpd.vwrt.listen_http='[::]:2222'
-        uci set uhttpd.vwrt.home='/www/vwrt'
-        uci set uhttpd.vwrt.cgi_prefix='/cgi-bin'
-        uci set uhttpd.vwrt.ubus_prefix='/ubus'
-        uci set uhttpd.vwrt.max_connections='100'
+        uci delete uhttpd.NTC_WRT 2>/dev/null
+        uci set uhttpd.NTC_WRT=uhttpd
+        uci add_list uhttpd.NTC_WRT.listen_http='0.0.0.0:2222'
+        uci add_list uhttpd.NTC_WRT.listen_http='[::]:2222'
+        uci set uhttpd.NTC_WRT.home='/www/NTC_WRT'
+        uci set uhttpd.NTC_WRT.cgi_prefix='/cgi-bin'
+        uci set uhttpd.NTC_WRT.ubus_prefix='/ubus'
+        uci set uhttpd.NTC_WRT.max_connections='100'
         uci commit uhttpd
 
         # Enable and start services
@@ -122,13 +122,13 @@ case $choice in
 
         echo "---------------------------------------------------"
         echo "Installation Completed Successfully!"
-        echo "VWRT WebUI is live on: http://192.168.88.1:2222/"
+        echo "NTC_WRT WebUI is live on: http://192.168.88.1:2222/"
         echo "==================================================="
         ;;
     2)
         echo "Starting Uninstallation..."
         
-        echo "Stopping and disabling VWRT services..."
+        echo "Stopping and disabling NTC_WRT services..."
 
         # Stop running services
         /etc/init.d/mobile_poller stop 2>/dev/null
@@ -141,7 +141,7 @@ case $choice in
 
         # Remove service files
         rm -f /etc/init.d/mobile_poller /etc/init.d/sms_sync
-        rm -f /tmp/vwrt_mobile.json /tmp/vwrt_wan_interfaces /tmp/vwrt_rom_stats /tmp/modem_at.lock
+        rm -f /tmp/NTC_WRT_mobile.json /tmp/NTC_WRT_wan_interfaces /tmp/NTC_WRT_rom_stats /tmp/modem_at.lock
 
         echo "Restoring original LuCI files..."
         # Restore original LuCI CGI script from ROM
@@ -153,9 +153,9 @@ case $choice in
 
         echo "Removing Dashboard files..."
         # Remove WebUI files
-        rm -rf /www/vwrt
+        rm -rf /www/NTC_WRT
 
-        # Remove custom CGI scripts (only those belonging to VWRT dashboard)
+        # Remove custom CGI scripts (only those belonging to NTC_WRT dashboard)
         rm -rf /www/cgi-bin/dashboard \
                /www/cgi-bin/system \
                /www/cgi-bin/wifi \
@@ -173,8 +173,8 @@ case $choice in
                /www/cgi-bin/lib 2>/dev/null
 
         echo "Reverting uhttpd configuration to default..."
-        # Delete the custom vwrt uhttpd instance
-        uci delete uhttpd.vwrt 2>/dev/null
+        # Delete the custom NTC_WRT uhttpd instance
+        uci delete uhttpd.NTC_WRT 2>/dev/null
 
         # Reset default uhttpd home back to standard /www
         uci set uhttpd.main.home='/www'
@@ -185,7 +185,7 @@ case $choice in
 
         echo "---------------------------------------------------"
         echo "Uninstallation Completed Successfully!"
-        echo "All VWRT files removed and router reverted to default."
+        echo "All NTC_WRT files removed and router reverted to default."
         echo "LuCI is available on standard port 80: http://192.168.88.1/"
         echo "==================================================="
         ;;

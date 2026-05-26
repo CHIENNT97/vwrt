@@ -1,10 +1,10 @@
--- Rate Limiting Module for VWRT Dashboard
+-- Rate Limiting Module for NTC_WRT Dashboard
 -- Giới hạn số lần request để chống brute-force và spam
 
 local M = {}
 
 -- Storage file for rate limit data
-local RATE_LIMIT_FILE = "/tmp/vwrt_rate_limits.json"
+local RATE_LIMIT_FILE = "/tmp/NTC_WRT_rate_limits.json"
 local json = require "luci.jsonc"
 
 -- Load rate limit data from file

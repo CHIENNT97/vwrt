@@ -1,4 +1,4 @@
-const VWRT_API = {
+const NTC_WRT_API = {
     csrfToken: null,
     
     // Fetch CSRF token from server
@@ -27,7 +27,7 @@ const VWRT_API = {
     },
     
     call: function(object, method, params) {
-        const sessionId = localStorage.getItem('vwrt_session');
+        const sessionId = localStorage.getItem('ntc_wrt_session');
         if (!sessionId) {
             console.error("Chưa đăng nhập: Thiếu Session ID");
             return Promise.reject("No Session");
@@ -81,7 +81,7 @@ const VWRT_API = {
 
 // Auto-init CSRF token on page load
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => VWRT_API.init());
+    document.addEventListener('DOMContentLoaded', () => NTC_WRT_API.init());
 } else {
-    VWRT_API.init();
+    NTC_WRT_API.init();
 }

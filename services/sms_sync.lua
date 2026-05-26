@@ -5,7 +5,7 @@
 -- Supports: FM350 (AT) and mmcli (ModemManager)
 
 local cjson = require "cjson"
-package.path = "/www/vwrt/?.lua;/www/vwrt/cgi-bin/?.lua;" .. package.path
+package.path = "/www/NTC_WRT/?.lua;/www/NTC_WRT/cgi-bin/?.lua;" .. package.path
 
 local constants = require "lib.constants"
 local sms_util = require "lib.sms_util"
@@ -40,7 +40,7 @@ end
 
 function log(msg)
     local safe_msg = tostring(msg):gsub("'", "'\\''")
-    os.execute("logger -t VWRT_SMS_SYNC '" .. safe_msg .. "'")
+    os.execute("logger -t NTC_WRT_SMS_SYNC '" .. safe_msg .. "'")
     print(os.date("%H:%M:%S") .. " " .. tostring(msg))
 end
 

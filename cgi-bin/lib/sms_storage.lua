@@ -1,4 +1,4 @@
--- SMS Storage Library for VWRT
+-- SMS Storage Library for NTC_WRT
 -- This library provides atomic and locked access to the SMS archive
 local M = {}
 
@@ -11,7 +11,7 @@ local TMP_PATH = ARCHIVE_PATH .. ".tmp"
 
 -- Helper to log to system log
 local function log(msg)
-    os.execute("logger -t VWRT_SMS_STORAGE '" .. msg:gsub("'", "") .. "'")
+    os.execute("logger -t NTC_WRT_SMS_STORAGE '" .. msg:gsub("'", "") .. "'")
 end
 
 -- Atomic Lock using mkdir (standard for shell scripts and Lua on OpenWrt)

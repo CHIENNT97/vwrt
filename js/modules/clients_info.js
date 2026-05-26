@@ -362,7 +362,7 @@ const ClientsModule = {
                         </div>
                         <div>
                             <span style="font-size:11px; color:var(--text-sub); display:block; margin-bottom:2px;">Tổng Data</span>
-                            <span style="font-weight:600;">${VWRT_API.formatBytes(client.total)}</span>
+                            <span style="font-weight:600;">${NTC_WRT_API.formatBytes(client.total)}</span>
                         </div>
                     </div>
                 </div>
@@ -394,12 +394,12 @@ const ClientsModule = {
                 const payload = { 
                     action: doBlock ? 'block' : 'unblock', 
                     mac: mac,
-                    csrf_token: VWRT_API.csrfToken 
+                    csrf_token: NTC_WRT_API.csrfToken 
                 };
 
                 fetch('/cgi-bin/clients/action', {
                     method: 'POST',
-                    headers: VWRT_API.getHeaders(),
+                    headers: NTC_WRT_API.getHeaders(),
                     body: JSON.stringify(payload)
                 })
                 .then(res => res.json())

@@ -206,9 +206,9 @@ const SettingsModule = {
         const payload = { type: type, url: url, version: ver };
         const headers = { 'Content-Type': 'application/json' };
         
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            payload.csrf_token = VWRT_API.csrfToken;
-            headers['X-CSRF-Token'] = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            payload.csrf_token = NTC_WRT_API.csrfToken;
+            headers['X-CSRF-Token'] = NTC_WRT_API.csrfToken;
         }
 
         fetch('/cgi-bin/system/update_run', {
@@ -263,9 +263,9 @@ const SettingsModule = {
         // Prepare Payload & Headers
         const payload = { action: action, param: param };
         const headers = { 'Content-Type': 'application/json' };
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            payload.csrf_token = VWRT_API.csrfToken;
-            headers['X-CSRF-Token'] = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            payload.csrf_token = NTC_WRT_API.csrfToken;
+            headers['X-CSRF-Token'] = NTC_WRT_API.csrfToken;
         }
 
         fetch('/cgi-bin/system/action', {
@@ -365,9 +365,9 @@ const SettingsModule = {
 
         const payload = { username: "root", password: pass };
         const headers = { 'Content-Type': 'application/json' };
-        if(typeof VWRT_API !== 'undefined' && VWRT_API.csrfToken) {
-            payload.csrf_token = VWRT_API.csrfToken;
-            headers['X-CSRF-Token'] = VWRT_API.csrfToken;
+        if(typeof NTC_WRT_API !== 'undefined' && NTC_WRT_API.csrfToken) {
+            payload.csrf_token = NTC_WRT_API.csrfToken;
+            headers['X-CSRF-Token'] = NTC_WRT_API.csrfToken;
         }
 
         fetch('/cgi-bin/system/passwd', {
