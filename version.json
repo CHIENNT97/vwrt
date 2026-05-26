@@ -1,7 +1,7 @@
 {
     "dashboard": {
-        "version": "1.1.7",
+        "version": "1.2.0",
         "url": "https://github.com/CHIENNT97/vwrt/archive/refs/heads/main.tar.gz",
-        "log": "- Fix: Sửa lỗi hiển thị cột sóng luôn 100% (tự động phát hiện RSRP 1/10 dBm).\n- Menu SSH: Cho phép chọn Cài đặt hoặc Gỡ cài đặt trực quan.\n- Loại bỏ module AdBlock không dùng."
+        "log": "- Fix: Sửa lỗi crash khi đồng bộ tin nhắn (biến result chưa định nghĩa trong cgi-bin).\n- Fix: Khai báo biến config trong sms_sync.lua để tránh lỗi biến global.\n- Feature: Thêm nút đồng bộ tin nhắn thủ công (🔄) và thông báo Toast trạng thái trên giao diện.\n- Fix: Chuẩn hóa định dạng header phản hồi CGI trong cgi-bin/sms/archive."
     }
 }

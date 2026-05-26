@@ -111,6 +111,10 @@ local sms_storage = require "lib.sms_storage"
 
 if force_sync == "true" then
     -- Force read from modem (Refresh button)
+    local config = get_config()
+    local driver_lib = get_driver()
+    local result = driver_lib.get_sms(config) or { messages = {}, storage = { used = 0, total = 20 } }
+
     -- Load synced_ids for filtering
     local ARCHIVE_FILE = constants.PATHS.SMS_ARCHIVE
     local archive_content = read_file(ARCHIVE_FILE)
@@ -153,7 +157,7 @@ else
         -- But FILTER OUT anything in synced_ids to prevent re-appearance of deleted/stuck msgs
         local config = get_config()
         local driver_lib = get_driver()
-        local result = driver_lib.get_sms(config)
+        local result = driver_lib.get_sms(config) or { messages = {}, storage = { used = 0, total = 20 } }
         
         local synced_ids = archive.synced_ids or {}
 

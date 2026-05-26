@@ -10,6 +10,8 @@ package.path = "/www/NTC_WRT/?.lua;/www/NTC_WRT/cgi-bin/?.lua;" .. package.path
 local constants = require "lib.constants"
 local sms_util = require "lib.sms_util"
 local ARCHIVE_FILE = constants.PATHS.SMS_ARCHIVE
+local config = { driver = "dynamic", modem_index = "0" }
+
 
 -- Helper functions
 function exec(cmd)

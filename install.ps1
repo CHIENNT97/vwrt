@@ -15,23 +15,23 @@ $env:SSH_ASKPASS_REQUIRE = 'force'
 $env:DISPLAY = 'dummy:0'
 
 Write-Host '===================================================' -ForegroundColor Green
-Write-Host '      VWRT Dashboard Manager for QModem' -ForegroundColor Green
+Write-Host '      NTC_WRT Dashboard Manager for QModem' -ForegroundColor Green
 Write-Host '===================================================' -ForegroundColor Green
 Write-Host "Target Router IP: $ip" -ForegroundColor Cyan
 Write-Host '---------------------------------------------------' -ForegroundColor Gray
-Write-Host 'Chọn thao tác bạn muốn thực hiện:' -ForegroundColor Yellow
-Write-Host ' [1] Cài đặt / Cập nhật Dashboard VWRT' -ForegroundColor White
-Write-Host ' [2] Gỡ bỏ Dashboard VWRT (Khôi phục mặc định)' -ForegroundColor White
+Write-Host 'Chon thao tac ban muon thuc hien:' -ForegroundColor Yellow
+Write-Host ' [1] Cai dat / Cap nhat Dashboard NTC_WRT' -ForegroundColor White
+Write-Host ' [2] Go bo Dashboard NTC_WRT (Khoi phuc mac dinh)' -ForegroundColor White
 Write-Host '---------------------------------------------------' -ForegroundColor Gray
 
-$choice = Read-Host "Nhập lựa chọn của bạn (1 hoặc 2, mặc định là 1)"
+$choice = Read-Host "Nhap lua chon cua ban (1 hoac 2, mac dinh la 1)"
 if ([string]::IsNullOrWhiteSpace($choice)) { $choice = "1" }
 
 if ($choice -eq "2") {
-    Write-Host 'Bắt đầu quá trình gỡ cài đặt VWRT Dashboard khỏi Router...' -ForegroundColor Yellow
+    Write-Host 'Bat dau qua trinh go cai dat NTC_WRT Dashboard khoi Router...' -ForegroundColor Yellow
     
     $remote_uninstall_script = @'
-echo "Stopping and disabling VWRT services..."
+echo "Stopping and disabling NTC_WRT services..."
 /etc/init.d/mobile_poller stop 2>/dev/null
 /etc/init.d/sms_sync stop 2>/dev/null
 killall -9 mobile_poller.lua sms_sync.lua 2>/dev/null
@@ -40,7 +40,7 @@ killall -9 mobile_poller.lua sms_sync.lua 2>/dev/null
 
 echo "Removing Dashboard and service files..."
 rm -f /etc/init.d/mobile_poller /etc/init.d/sms_sync
-rm -f /tmp/vwrt_mobile.json /tmp/vwrt_wan_interfaces /tmp/vwrt_rom_stats /tmp/modem_at.lock
+rm -f /tmp/NTC_WRT_mobile.json /tmp/NTC_WRT_wan_interfaces /tmp/NTC_WRT_rom_stats /tmp/modem_at.lock
 
 echo "Restoring original LuCI file..."
 rm -f /www/cgi-bin/luci
@@ -49,7 +49,7 @@ if [ -f /rom/www/cgi-bin/luci ]; then
     chmod +x /www/cgi-bin/luci
 fi
 
-rm -rf /www/vwrt
+rm -rf /www/NTC_WRT
 rm -rf /www/cgi-bin/dashboard \
        /www/cgi-bin/system \
        /www/cgi-bin/wifi \
@@ -67,64 +67,64 @@ rm -rf /www/cgi-bin/dashboard \
        /www/cgi-bin/lib 2>/dev/null
 
 echo "Reverting uhttpd settings..."
-uci delete uhttpd.vwrt 2>/dev/null
+uci delete uhttpd.NTC_WRT 2>/dev/null
 uci set uhttpd.main.home='/www'
 uci commit uhttpd
 /etc/init.d/uhttpd restart
 
 echo "Uninstallation finished successfully!"
 '@
-
+    
     $remoteScriptPath = Join-Path $binDir 'remote_uninstall.sh'
     Set-Content -Path $remoteScriptPath -Value $remote_uninstall_script -Encoding ascii
 
     Write-Host 'Uploading uninstaller to router...' -ForegroundColor Yellow
     & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL $remoteScriptPath ("root@" + $ip + ":/tmp/remote_uninstall.sh")
     Write-Host 'Running uninstaller on router...' -ForegroundColor Yellow
-    & ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL ("root@" + $ip) "sh /tmp/remote_uninstall.sh && rm /tmp/remote_uninstall.sh"
+    & ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL ("root@" + $ip) "sh /tmp/remote_uninstall.sh ; rm -f /tmp/remote_uninstall.sh"
     
     if (Test-Path $askpass) { Remove-Item -Path $askpass -Force | Out-Null }
     if (Test-Path $binDir) { Remove-Item -Recurse -Force $binDir | Out-Null }
     
     Write-Host '---------------------------------------------------' -ForegroundColor Gray
-    Write-Host 'Gỡ cài đặt hoàn tất! Thiết bị đã được đưa về mặc định.' -ForegroundColor Green
-    Write-Host 'LuCI gốc hoạt động tại địa chỉ: http://192.168.88.1/' -ForegroundColor Green
+    Write-Host 'Go cai dat hoan tat! Thiet bi da duoc dua ve mac dinh.' -ForegroundColor Green
+    Write-Host 'LuCI goc hoat dong tai dia chi: http://192.168.88.1/' -ForegroundColor Green
     Write-Host '===================================================' -ForegroundColor Green
 }
 else {
-    Write-Host 'Bắt đầu quá trình cài đặt VWRT Dashboard...' -ForegroundColor Yellow
-    $tarPath = Join-Path $localRoot 'vwrt_upload.tar.gz'
+    Write-Host 'Bat dau qua trinh cai dat NTC_WRT Dashboard...' -ForegroundColor Yellow
+    $tarPath = Join-Path $localRoot 'NTC_WRT_upload.tar.gz'
     if (Test-Path $tarPath) { Remove-Item $tarPath -Force }
     
     Push-Location $localRoot
-    tar -czf vwrt_upload.tar.gz index.html dashboard.html version.json css js lib services cgi-bin install.sh uninstall.sh
+    tar -czf NTC_WRT_upload.tar.gz index.html dashboard.html version.json css js lib services cgi-bin install.sh
     Pop-Location
     
     Write-Host 'Uploading archive to router...' -ForegroundColor Yellow
-    & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL $tarPath ("root@" + $ip + ":/tmp/vwrt_upload.tar.gz")
+    & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL $tarPath ("root@" + $ip + ":/tmp/NTC_WRT_upload.tar.gz")
     
     Write-Host 'Extracting and configuring on router...' -ForegroundColor Yellow
     $remote_script = @'
-mkdir -p /tmp/vwrt_extract /www/vwrt /www/vwrt/services /www/cgi-bin
-tar -xzf /tmp/vwrt_upload.tar.gz -C /tmp/vwrt_extract
+mkdir -p /tmp/NTC_WRT_extract /www/NTC_WRT /www/NTC_WRT/services /www/cgi-bin
+tar -xzf /tmp/NTC_WRT_upload.tar.gz -C /tmp/NTC_WRT_extract
 
 # Copy web files
-cp /tmp/vwrt_extract/index.html /www/vwrt/
-cp /tmp/vwrt_extract/dashboard.html /www/vwrt/
-cp /tmp/vwrt_extract/version.json /www/vwrt/
-cp -r /tmp/vwrt_extract/css /www/vwrt/
-cp -r /tmp/vwrt_extract/js /www/vwrt/
-cp -r /tmp/vwrt_extract/lib /www/vwrt/
+cp /tmp/NTC_WRT_extract/index.html /www/NTC_WRT/
+cp /tmp/NTC_WRT_extract/dashboard.html /www/NTC_WRT/
+cp /tmp/NTC_WRT_extract/version.json /www/NTC_WRT/
+cp -r /tmp/NTC_WRT_extract/css /www/NTC_WRT/
+cp -r /tmp/NTC_WRT_extract/js /www/NTC_WRT/
+cp -r /tmp/NTC_WRT_extract/lib /www/NTC_WRT/
 
 # Copy services
-cp -r /tmp/vwrt_extract/services /www/vwrt/
+cp -r /tmp/NTC_WRT_extract/services /www/NTC_WRT/
 
 # Copy cgi-bin endpoints
-cp -r /tmp/vwrt_extract/cgi-bin/* /www/cgi-bin/ 2>/dev/null || cp -r /tmp/vwrt_extract/cgi-bin /www/
+cp -r /tmp/NTC_WRT_extract/cgi-bin/* /www/cgi-bin/ 2>/dev/null || cp -r /tmp/NTC_WRT_extract/cgi-bin /www/
 
 # Copy init scripts
-cp /tmp/vwrt_extract/services/init.d/mobile_poller /etc/init.d/ 2>/dev/null
-cp /tmp/vwrt_extract/services/init.d/sms_sync /etc/init.d/ 2>/dev/null
+cp /www/NTC_WRT/services/init.d/mobile_poller /etc/init.d/ 2>/dev/null
+cp /www/NTC_WRT/services/init.d/sms_sync /etc/init.d/ 2>/dev/null
 
 # Restore original LuCI from ROM if it exists and /www/cgi-bin/luci is a symlink loop
 if [ -L /www/cgi-bin/luci ] || [ ! -f /www/cgi-bin/luci ]; then
@@ -133,24 +133,27 @@ if [ -L /www/cgi-bin/luci ] || [ ! -f /www/cgi-bin/luci ]; then
 fi
 
 # Configure directory symbolic links
-rm -rf /www/vwrt/cgi-bin
-ln -s /www/cgi-bin /www/vwrt/cgi-bin
+rm -rf /www/NTC_WRT/cgi-bin
+ln -s /www/cgi-bin /www/NTC_WRT/cgi-bin
 
 # Normalize file endings and set permissions
-sed -i 's/\r$//' /etc/init.d/mobile_poller /etc/init.d/sms_sync /www/vwrt/services/at_cmd.sh 2>/dev/null
+sed -i 's/\r$//' /etc/init.d/mobile_poller /etc/init.d/sms_sync /www/NTC_WRT/services/at_cmd.sh 2>/dev/null
+find /www/NTC_WRT/ -type f -name "*.sh" -o -name "*.lua" 2>/dev/null | xargs sed -i 's/\r$//' 2>/dev/null
+find /www/cgi-bin/ -type f 2>/dev/null | xargs sed -i 's/\r$//' 2>/dev/null
+
 chmod +x /etc/init.d/mobile_poller /etc/init.d/sms_sync 2>/dev/null
 chmod -R +x /www/cgi-bin/ 2>/dev/null
-chmod -R +x /www/vwrt/services/ 2>/dev/null
+chmod -R +x /www/NTC_WRT/services/ 2>/dev/null
 
 # Configure uhttpd
-uci delete uhttpd.vwrt 2>/dev/null
-uci set uhttpd.vwrt=uhttpd
-uci add_list uhttpd.vwrt.listen_http='0.0.0.0:2222'
-uci add_list uhttpd.vwrt.listen_http='[::]:2222'
-uci set uhttpd.vwrt.home='/www/vwrt'
-uci set uhttpd.vwrt.cgi_prefix='/cgi-bin'
-uci set uhttpd.vwrt.ubus_prefix='/ubus'
-uci set uhttpd.vwrt.max_connections='100'
+uci delete uhttpd.NTC_WRT 2>/dev/null
+uci set uhttpd.NTC_WRT=uhttpd
+uci add_list uhttpd.NTC_WRT.listen_http='0.0.0.0:2222'
+uci add_list uhttpd.NTC_WRT.listen_http='[::]:2222'
+uci set uhttpd.NTC_WRT.home='/www/NTC_WRT'
+uci set uhttpd.NTC_WRT.cgi_prefix='/cgi-bin'
+uci set uhttpd.NTC_WRT.ubus_prefix='/ubus'
+uci set uhttpd.NTC_WRT.max_connections='100'
 uci commit uhttpd
 
 # Enable and restart services
@@ -167,7 +170,7 @@ rm -f /tmp/modem_at.lock
 /etc/init.d/sms_sync restart
 
 # Clean up remote temp files
-rm -rf /tmp/vwrt_extract /tmp/vwrt_upload.tar.gz
+rm -rf /tmp/NTC_WRT_extract /tmp/NTC_WRT_upload.tar.gz
 '@
 
     $remoteScriptPath = Join-Path $binDir 'remote_setup.sh'
@@ -175,7 +178,7 @@ rm -rf /tmp/vwrt_extract /tmp/vwrt_upload.tar.gz
     
     Write-Host 'Running remote configuration script...' -ForegroundColor Yellow
     & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL $remoteScriptPath ("root@" + $ip + ":/tmp/remote_setup.sh")
-    & ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL ("root@" + $ip) "sh /tmp/remote_setup.sh && rm /tmp/remote_setup.sh"
+    & ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL ("root@" + $ip) "sh /tmp/remote_setup.sh ; rm -f /tmp/remote_setup.sh"
     
     if (Test-Path $askpass) { Remove-Item -Path $askpass -Force | Out-Null }
     if (Test-Path $binDir) { Remove-Item -Recurse -Force $binDir | Out-Null }
@@ -184,6 +187,6 @@ rm -rf /tmp/vwrt_extract /tmp/vwrt_upload.tar.gz
     Write-Host '---------------------------------------------------' -ForegroundColor Gray
     Write-Host 'Deployment completed successfully!' -ForegroundColor Green
     Write-Host 'LuCI (Original WebUI) is live on: http://192.168.88.1/' -ForegroundColor Green
-    Write-Host 'VWRT WebUI is live on: http://192.168.88.1:2222/' -ForegroundColor Green
+    Write-Host 'NTC_WRT WebUI is live on: http://192.168.88.1:2222/' -ForegroundColor Green
     Write-Host '===================================================' -ForegroundColor Green
 }

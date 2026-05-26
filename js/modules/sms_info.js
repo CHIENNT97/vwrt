@@ -137,10 +137,19 @@ const SmsModule = {
         if (isFull) url += "&full=true";
         if (forceSync) url += "&sync=true";
 
+        if (forceSync && typeof Toast !== "undefined") {
+            Toast.show("Đang đồng bộ tin nhắn từ SIM...", "info");
+        }
+
         fetch(url)
             .then((res) => res.json())
             .then((res) => {
-                if (res.status === "error") return;
+                if (res.status === "error") {
+                    if (forceSync && typeof Toast !== "undefined") {
+                        Toast.show("Lỗi đồng bộ: " + (res.message || "Không rõ nguyên nhân"), "error");
+                    }
+                    return;
+                }
                 const messages = res.data || [];
                 const storage = res.storage || {
                     used: messages.length,
@@ -151,8 +160,15 @@ const SmsModule = {
                     this.renderFullTable(messages, storage);
                 }
                 this.renderDashboardCard(messages, storage);
+                if (forceSync && typeof Toast !== "undefined") {
+                    Toast.show("Đồng bộ hoàn tất!", "success");
+                }
             })
-            .catch((err) => {});
+            .catch((err) => {
+                if (forceSync && typeof Toast !== "undefined") {
+                    Toast.show("Không thể kết nối đến thiết bị!", "error");
+                }
+            });
     },
 
     getDisplayTime: function (msg) {
@@ -376,8 +392,11 @@ const SmsModule = {
                     </div>
                     <div class="sms-manage-bar" style="padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #e2e8f0; display:flex; flex-wrap: wrap; align-items:center; gap:10px;">
                         <div style="display:flex; gap:8px;">
-                            <button onclick="SmsModule.deleteSelected()" style="background: #e53e3e; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size:16px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; min-width:42px;">
+                            <button onclick="SmsModule.deleteSelected()" style="background: #e53e3e; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size:16px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; min-width:42px;" title="Xóa các tin nhắn đã chọn">
                                 <span>🗑</span>
+                            </button>
+                            <button onclick="SmsModule.fetchInbox(true, true)" style="background: #3182ce; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size:16px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; min-width:42px;" title="Đồng bộ lại từ SIM">
+                                <span>🔄</span>
                             </button>
                         </div>
                         

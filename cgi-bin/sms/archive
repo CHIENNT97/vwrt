@@ -217,7 +217,7 @@ function parse_timestamp(ts)
 end
 
 -- Main handler
-print("Content-type: application/json\n\n")
+print("Content-type: application/json\n")
 
 local archive = load_archive()
 local query = os.getenv("QUERY_STRING") or ""
