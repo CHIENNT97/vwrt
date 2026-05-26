@@ -8,7 +8,7 @@ echo " 2. Uninstall VWRT Dashboard"
 echo " 3. Cancel"
 echo "==================================================="
 printf "Please select an option (1-3): "
-read choice
+read choice < /dev/tty
 
 case $choice in
     1)
