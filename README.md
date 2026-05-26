@@ -57,3 +57,20 @@ Hệ thống VWRT Dashboard mang đến trải nghiệm quản lý Router hoàn 
 - Hỗ trợ cập nhật riêng biệt Dashboard.
 
 ---
+
+## 🛠️ Hướng Dẫn Cài Đặt Qua SSH
+
+Bạn có thể dễ dàng cài đặt, cập nhật hoặc gỡ bỏ VWRT Dashboard bằng cách chạy lệnh duy nhất dưới đây qua SSH của Router:
+
+```sh
+wget -O /tmp/install.sh https://raw.githubusercontent.com/CHIENNT97/vwrt/main/install.sh && sh /tmp/install.sh
+```
+
+**Màn hình quản lý sẽ hiện ra với các tùy chọn:**
+1. Install / Update VWRT Dashboard
+2. Uninstall VWRT Dashboard
+3. Cancel
+
+Chỉ cần nhập lựa chọn của bạn (1 hoặc 2) để tiến hành. Sau khi cài đặt hoàn tất, bạn có thể truy cập Dashboard tại: `http://192.168.88.1:2222/`
+
+---

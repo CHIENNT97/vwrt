@@ -58,7 +58,6 @@ rm -rf /www/cgi-bin/dashboard \
        /www/cgi-bin/ttl \
        /www/cgi-bin/csrf \
        /www/cgi-bin/clients \
-       /www/cgi-bin/adblock \
        /www/cgi-bin/mwan3 \
        /www/cgi-bin/reboot_schedule \
        /www/cgi-bin/led \

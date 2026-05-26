@@ -98,14 +98,6 @@ const SidebarModule = {
             return;
         }
 
-        if(featureName === 'adblock') {
-            // Open custom AdBlock modal
-            if(typeof AdBlockModule !== 'undefined') {
-                AdBlockModule.showModal();
-            }
-            return;
-        }
-
         if(featureName === 'led') {
             if(typeof LedModule !== 'undefined') {
                 LedModule.showModal();
