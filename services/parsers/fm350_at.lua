@@ -119,15 +119,25 @@ function M.parse_all_signal(output)
                             local rsrq_raw = tonumber(parts[14])
                             
                             if sinr_raw and sinr_raw ~= 255 then
-                                if rat == "9" then res.sinr = string.format("%.1f", (sinr_raw - 45) / 2 - 1)
-                                else res.sinr = string.format("%.1f", sinr_raw / 2) end
+                                local final_sinr
+                                if rat == "9" then
+                                    if sinr_raw <= 50 and sinr_raw >= -20 then
+                                        final_sinr = sinr_raw / 2
+                                    else
+                                        final_sinr = (sinr_raw - 45) / 2 - 1
+                                    end
+                                else
+                                    final_sinr = sinr_raw / 2
+                                end
+                                res.sinr = string.format("%.1f", final_sinr)
                             end
                             
                             if rsrp_raw and rsrp_raw ~= 255 then
                                 local final_rsrp
                                 if math.abs(rsrp_raw) > 200 then
-                                    -- Value is in tenths of dBm (e.g. 706 or -706 for -70.6 dBm)
-                                    final_rsrp = - (math.abs(rsrp_raw) / 10)
+                                    -- Value is in tenths of dBm (e.g. 536 meaning -96.4 dBm)
+                                    final_rsrp = (math.abs(rsrp_raw) / 10) - 150
+                                    if final_rsrp > 0 then final_rsrp = -final_rsrp end
                                 else
                                     -- Standard 3GPP index mapping
                                     if rat == "9" then 
