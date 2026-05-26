@@ -124,8 +124,19 @@ function M.parse_all_signal(output)
                             end
                             
                             if rsrp_raw and rsrp_raw ~= 255 then
-                                if rat == "9" then res.rsrp = tostring(rsrp_raw - 157)
-                                else res.rsrp = tostring(rsrp_raw - 141) end
+                                local final_rsrp
+                                if math.abs(rsrp_raw) > 200 then
+                                    -- Value is in tenths of dBm (e.g. 706 or -706 for -70.6 dBm)
+                                    final_rsrp = - (math.abs(rsrp_raw) / 10)
+                                else
+                                    -- Standard 3GPP index mapping
+                                    if rat == "9" then 
+                                        final_rsrp = rsrp_raw - 157
+                                    else 
+                                        final_rsrp = rsrp_raw - 141 
+                                    end
+                                end
+                                res.rsrp = string.format("%.1f", final_rsrp)
                             end
                             
                             if rsrq_raw and rsrq_raw ~= 255 then
