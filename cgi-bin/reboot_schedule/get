@@ -10,7 +10,7 @@ print("")
 
 local function read_schedules()
     local schedules = {}
-    local schedule_file = "/etc/vwrt_reboot_schedule.json"
+    local schedule_file = "/etc/NTC_WRT_reboot_schedule.json"
     
     local f = io.open(schedule_file, "r")
     if f then
@@ -32,7 +32,7 @@ local function get_schedule()
     }
     
     -- Check if scheduling is enabled (via presence of cron entries)
-    local p = io.popen("grep -c 'vwrt_reboot' /etc/crontabs/root 2>/dev/null || echo 0")
+    local p = io.popen("grep -c 'NTC_WRT_reboot' /etc/crontabs/root 2>/dev/null || echo 0")
     if p then
         local count = tonumber(p:read("*l")) or 0
         result.enabled = count > 0

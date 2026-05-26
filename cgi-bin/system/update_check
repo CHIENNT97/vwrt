@@ -4,7 +4,7 @@ local cjson = require "cjson"
 
 local UPDATE_URL = "https://raw.githubusercontent.com/CHIENNT97/vwrt/refs/heads/main/version.json"
 
-local LOCAL_VER_FILE = "/www/vwrt/version.json"
+local LOCAL_VER_FILE = "/www/NTC_WRT/version.json"
 
 function read_file(path)
     local f = io.open(path, "r")

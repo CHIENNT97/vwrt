@@ -13,8 +13,8 @@ local function main()
             package.path = cgi_root .. "?.lua;" .. package.path
         end
     end
-    if not package.path:find("/www/vwrt/cgi-bin") then
-        package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+    if not package.path:find("/www/NTC_WRT/cgi-bin") then
+        package.path = "/www/NTC_WRT/cgi-bin/?.lua;" .. package.path
     end
 
     print("Content-Type: application/json\n")
@@ -59,13 +59,13 @@ local function main()
     local current_time = os.time()
 
     -- ensure accounting chain exists
-    exec("iptables -N VWRT_ACCT 2>/dev/null")
-    exec("iptables -C FORWARD -j VWRT_ACCT 2>/dev/null || iptables -I FORWARD -j VWRT_ACCT")
+    exec("iptables -N NTC_WRT_ACCT 2>/dev/null")
+    exec("iptables -C FORWARD -j NTC_WRT_ACCT 2>/dev/null || iptables -I FORWARD -j NTC_WRT_ACCT")
 
     -- Parse current counters from iptables-save
-    -- Format: [packets:bytes] -A VWRT_ACCT -s 1.2.3.4 ...
+    -- Format: [packets:bytes] -A NTC_WRT_ACCT -s 1.2.3.4 ...
     local acct_data = {}
-    local acct_raw = exec("iptables-save -c | grep VWRT_ACCT")
+    local acct_raw = exec("iptables-save -c | grep NTC_WRT_ACCT")
     if acct_raw then
         for line in acct_raw:gmatch("[^\r\n]+") do
             local pkts, bytes, rule = line:match("%[(%d+):(%d+)%]%s+(.*)")
@@ -168,7 +168,7 @@ local function main()
     
     -- Load blocked list from UCI
     local uci = require("luci.model.uci").cursor()
-    local blocked_list = uci:get("vwrt", "clients", "blocked") or {}
+    local blocked_list = uci:get("NTC_WRT", "clients", "blocked") or {}
     if type(blocked_list) == "string" then blocked_list = {blocked_list} end
     local is_blocked = {}
     for _, bmac in ipairs(blocked_list) do
@@ -216,8 +216,8 @@ local function main()
                         -- Traffic Accounting Sync
                         local stats = acct_data[ip]
                         if not stats and ip and ip ~= "" then
-                            exec(string.format("iptables -A VWRT_ACCT -s %s -j RETURN", ip))
-                            exec(string.format("iptables -A VWRT_ACCT -d %s -j RETURN", ip))
+                            exec(string.format("iptables -A NTC_WRT_ACCT -s %s -j RETURN", ip))
+                            exec(string.format("iptables -A NTC_WRT_ACCT -d %s -j RETURN", ip))
                         end
                         
                         local rx = stats and stats.rx or 0

@@ -11,8 +11,8 @@ if script_path then
         package.path = cgi_root .. "?.lua;" .. package.path
     end
 end
-if not package.path:find("/www/vwrt/cgi-bin") then
-    package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+if not package.path:find("/www/NTC_WRT/cgi-bin") then
+    package.path = "/www/NTC_WRT/cgi-bin/?.lua;" .. package.path
 end
 
 local json = require("luci.jsonc")
@@ -132,37 +132,37 @@ local function run_update()
         f:write("/etc/init.d/sms_sync stop 2>/dev/null\n")
         
         -- CLEAN INSTALL: Delete old files
-        f:write("rm -rf /www/vwrt/*\n")
+        f:write("rm -rf /www/NTC_WRT/*\n")
         
         -- Copy Strategy: Flattened Structure (Standard)
         -- We already identified the correct source_folder above, so just copy.
-        f:write("cp -rf '" .. source_folder .. "'* /www/vwrt/\n")
+        f:write("cp -rf '" .. source_folder .. "'* /www/NTC_WRT/\n")
         
         -- CLEANUP DEV ARTIFACTS (Important for GitHub Source updates)
-        f:write("rm -rf /www/vwrt/.editorconfig /www/vwrt/.vscode /www/vwrt/.git* /www/vwrt/deploy_tool /www/vwrt/dist\n")
+        f:write("rm -rf /www/NTC_WRT/.editorconfig /www/NTC_WRT/.vscode /www/NTC_WRT/.git* /www/NTC_WRT/deploy_tool /www/NTC_WRT/dist\n")
         
         -- Copy CGI endpoints to global /www/cgi-bin/
-        f:write("cp -rf /www/vwrt/cgi-bin/* /www/cgi-bin/ 2>/dev/null\n")
-        f:write("rm -rf /www/vwrt/cgi-bin\n")
-        f:write("ln -snf /www/cgi-bin /www/vwrt/cgi-bin\n")
+        f:write("cp -rf /www/NTC_WRT/cgi-bin/* /www/cgi-bin/ 2>/dev/null\n")
+        f:write("rm -rf /www/NTC_WRT/cgi-bin\n")
+        f:write("ln -snf /www/cgi-bin /www/NTC_WRT/cgi-bin\n")
         
         -- Copy init scripts to /etc/init.d/
-        f:write("cp -f /www/vwrt/services/init.d/mobile_poller /etc/init.d/ 2>/dev/null\n")
-        f:write("cp -f /www/vwrt/services/init.d/sms_sync /etc/init.d/ 2>/dev/null\n")
+        f:write("cp -f /www/NTC_WRT/services/init.d/mobile_poller /etc/init.d/ 2>/dev/null\n")
+        f:write("cp -f /www/NTC_WRT/services/init.d/sms_sync /etc/init.d/ 2>/dev/null\n")
         f:write("chmod +x /etc/init.d/mobile_poller /etc/init.d/sms_sync 2>/dev/null\n")
         
         -- Normalize line endings (CRLF to LF) for shell and lua scripts
-        f:write("sed -i 's/\\r$//' /etc/init.d/mobile_poller /etc/init.d/sms_sync /www/vwrt/services/at_cmd.sh 2>/dev/null\n")
-        f:write("find /www/vwrt/ -type f -name '*.sh' -o -name '*.lua' 2>/dev/null | xargs sed -i 's/\\r$//' 2>/dev/null\n")
+        f:write("sed -i 's/\\r$//' /etc/init.d/mobile_poller /etc/init.d/sms_sync /www/NTC_WRT/services/at_cmd.sh 2>/dev/null\n")
+        f:write("find /www/NTC_WRT/ -type f -name '*.sh' -o -name '*.lua' 2>/dev/null | xargs sed -i 's/\\r$//' 2>/dev/null\n")
         f:write("find /www/cgi-bin/ -type f 2>/dev/null | xargs sed -i 's/\\r$//' 2>/dev/null\n")
         
         -- Fix permissions
-        f:write("chmod -R 755 /www/vwrt\n")
+        f:write("chmod -R 755 /www/NTC_WRT\n")
         f:write("chmod -R +x /www/cgi-bin/ 2>/dev/null\n")
-        f:write("chmod -R +x /www/vwrt/services/ 2>/dev/null\n")
+        f:write("chmod -R +x /www/NTC_WRT/services/ 2>/dev/null\n")
         
         -- Recreate Symlinks for LuCI (Absolute)
-        f:write("ln -snf /www/luci-static /www/vwrt/luci-static\n")
+        f:write("ln -snf /www/luci-static /www/NTC_WRT/luci-static\n")
         
         -- Restart services if they exist
         f:write("/etc/init.d/mobile_poller enable 2>/dev/null\n")
@@ -171,7 +171,7 @@ local function run_update()
         f:write("/etc/init.d/sms_sync start 2>/dev/null\n")
         
         -- CONFIG: Set Dashboard as Default on Port 80
-        f:write("uci set uhttpd.main.home='/www/vwrt'\n")
+        f:write("uci set uhttpd.main.home='/www/NTC_WRT'\n")
         f:write("uci commit uhttpd\n")
         f:write("/etc/init.d/uhttpd restart\n")
         

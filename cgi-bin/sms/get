@@ -1,8 +1,8 @@
 #!/usr/bin/lua
 print("Content-type: application/json\n")
 
-local script_path = "/www/vwrt/cgi-bin/"
-package.path = script_path .. "?.lua;/www/vwrt/?.lua;" .. package.path
+local script_path = "/www/NTC_WRT/cgi-bin/"
+package.path = script_path .. "?.lua;/www/NTC_WRT/?.lua;" .. package.path
 
 local json = require "luci.jsonc"
 local constants = require "lib.constants"

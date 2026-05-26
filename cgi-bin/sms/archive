@@ -1,8 +1,8 @@
 #!/usr/bin/lua
 
--- Add parent /www/vwrt/ to package path for lib modules
-if not package.path:find("/www/vwrt") then
-    package.path = "/www/vwrt/?.lua;" .. package.path
+-- Add parent /www/NTC_WRT/ to package path for lib modules
+if not package.path:find("/www/NTC_WRT") then
+    package.path = "/www/NTC_WRT/?.lua;" .. package.path
 end
 
 local cjson = require "cjson"

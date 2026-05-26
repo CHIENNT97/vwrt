@@ -82,9 +82,9 @@ function ensure_tailscale_config()
     os.execute("uci set firewall.lan_to_ts.dest='tailscale'")
     
     -- Cleanup old/custom names
-    os.execute("uci delete network.ts_vwrt 2>/dev/null")
-    os.execute("uci delete firewall.ts_vwrt 2>/dev/null")
-    os.execute("uci delete firewall.vwrt_ts 2>/dev/null")
+    os.execute("uci delete network.ts_NTC_WRT 2>/dev/null")
+    os.execute("uci delete firewall.ts_NTC_WRT 2>/dev/null")
+    os.execute("uci delete firewall.NTC_WRT_ts 2>/dev/null")
     
     os.execute("uci commit firewall")
     

@@ -12,7 +12,7 @@ end
 
 print("Content-type: application/json\n\n")
 
-local content = read_file("/www/vwrt/version.json")
+local content = read_file("/www/NTC_WRT/version.json")
 
 if content and content ~= "" then
     print(content)

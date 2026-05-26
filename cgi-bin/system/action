@@ -9,8 +9,8 @@ if script_path then
         package.path = cgi_root .. "?.lua;" .. package.path
     end
 end
-if not package.path:find("/www/vwrt/cgi-bin") then
-    package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+if not package.path:find("/www/NTC_WRT/cgi-bin") then
+    package.path = "/www/NTC_WRT/cgi-bin/?.lua;" .. package.path
 end
 
 local cjson = require "cjson"
@@ -69,7 +69,7 @@ elseif action == "restart_mobile" then
     os.execute("/etc/init.d/modemmanager restart > /dev/null 2>&1")
     os.execute("killall mobile_poller.lua > /dev/null 2>&1")
     
-    local cmd = "lua /www/vwrt/services/mobile_poller.lua > /dev/null 2>&1 &"
+    local cmd = "lua /www/NTC_WRT/services/mobile_poller.lua > /dev/null 2>&1 &"
     
     -- Wait 5s for services to get ready
     os.execute("sleep 5 && " .. cmd)

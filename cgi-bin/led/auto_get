@@ -1,6 +1,6 @@
 #!/usr/bin/lua
 local json = require("luci.jsonc")
-local f = io.open("/etc/vwrt_autoled.json", "r")
+local f = io.open("/etc/NTC_WRT_autoled.json", "r")
 local content = "{}"
 if f then
     content = f:read("*all")

@@ -27,7 +27,7 @@ end
 
 -- 1. Read OLD config to find what needs to be cleaned up
 local old_config = {}
-local f_read = io.open("/etc/vwrt_autoled.json", "r")
+local f_read = io.open("/etc/NTC_WRT_autoled.json", "r")
 if f_read then
     local content = f_read:read("*all")
     f_read:close()
@@ -35,7 +35,7 @@ if f_read then
 end
 
 -- 2. Save NEW config
-local f = io.open("/etc/vwrt_autoled.json", "w")
+local f = io.open("/etc/NTC_WRT_autoled.json", "w")
 if f then
     f:write(json.stringify(data))
     f:close()

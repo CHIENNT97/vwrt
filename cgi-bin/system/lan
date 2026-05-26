@@ -2,7 +2,7 @@
 
 -- Add project path to package.path
 -- Use absolute path for cgi-bin modules
-package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+package.path = "/www/NTC_WRT/cgi-bin/?.lua;" .. package.path
 
 local cjson = require "cjson"
 local csrf = require "lib.csrf"

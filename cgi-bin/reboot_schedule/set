@@ -3,7 +3,7 @@
 
 -- DEBUG LOGGING (Re-enabled)
 local function log(msg)
-    local f = io.open("/tmp/vwrt_debug.log", "a")
+    local f = io.open("/tmp/NTC_WRT_debug.log", "a")
     if f then
         f:write(os.date() .. " [reboot_schedule] " .. tostring(msg) .. "\n")
         f:close()
@@ -11,7 +11,7 @@ local function log(msg)
 end
 log("Script started")
 
-local script_path = "/www/vwrt/cgi-bin/"
+local script_path = "/www/NTC_WRT/cgi-bin/"
 package.path = script_path .. "?.lua;" .. package.path
 
 local json = require("luci.jsonc")
@@ -20,7 +20,7 @@ local csrf = require("lib.csrf")
 print("Content-Type: application/json")
 print("")
 
-local schedule_file = "/etc/vwrt_reboot_schedule.json"
+local schedule_file = "/etc/NTC_WRT_reboot_schedule.json"
 local cron_file = "/etc/crontabs/root"
 
 local function parse_post_data()
@@ -74,12 +74,12 @@ end
 local function regenerate_cron()
     local schedules = read_schedules()
     
-    -- Read existing cron, remove vwrt_reboot entries
+    -- Read existing cron, remove NTC_WRT_reboot entries
     local existing_entries = {}
     local f = io.open(cron_file, "r")
     if f then
         for line in f:lines() do
-            if not line:match("vwrt_reboot") then
+            if not line:match("NTC_WRT_reboot") then
                 table.insert(existing_entries, line)
             end
         end
@@ -95,7 +95,7 @@ local function regenerate_cron()
                 if hour and min then
                     local days = schedule.days or "*"
                     -- Command: /sbin/reboot
-                    local cron_entry = string.format("%s %s * * %s /sbin/reboot # vwrt_reboot %s",
+                    local cron_entry = string.format("%s %s * * %s /sbin/reboot # NTC_WRT_reboot %s",
                         min, hour, days, schedule.id or "")
                     table.insert(existing_entries, cron_entry)
                 end
