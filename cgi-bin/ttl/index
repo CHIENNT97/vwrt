@@ -1,0 +1,116 @@
+#!/usr/bin/lua
+
+
+-- Dynamic Path Resolution
+local source = debug.getinfo(1).source
+local script_path = source:match("@?(.*[\\/])")
+if script_path then
+    local cgi_root = script_path:match("(.*cgi%-bin/)")
+    if cgi_root then
+        package.path = cgi_root .. "?.lua;" .. package.path
+    end
+end
+if not package.path:find("/www/vwrt/cgi-bin") then
+    package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+end
+
+local cjson = require "cjson"
+local csrf = require "lib.csrf"
+
+-- Helper to read request body
+function read_body()
+    local len = tonumber(os.getenv("CONTENT_LENGTH")) or 0
+    if len > 0 then
+        return io.read(len)
+    end
+    return nil
+end
+
+-- Helper to send JSON response
+function send_json(data)
+    print("Content-type: application/json\n")
+    print(cjson.encode(data))
+end
+
+-- Path to nft file
+local NFT_FILE = "/etc/nftables.d/10-ttl-fix.nft"
+
+local method = os.getenv("REQUEST_METHOD")
+
+if method == "GET" then
+    -- Check VWRT config first
+    local f = io.open(NFT_FILE, "r")
+    local ttl = 0
+    if f then
+        local content = f:read("*all")
+        f:close()
+        local match = content:match("counter ip ttl set (%d+)")
+        if match then ttl = tonumber(match) end
+    end
+    
+    -- If no VWRT config, check ROM default config
+    if ttl == 0 then
+        local f2 = io.open("/etc/nftables.d/10-custom-filter-chains.nft", "r")
+        if f2 then
+            local content = f2:read("*all")
+            f2:close()
+            local match = content:match("counter ip ttl set (%d+)")
+            if match then ttl = tonumber(match) end
+        end
+    end
+    
+    send_json({ status = "success", ttl = ttl })
+
+elseif method == "POST" then
+    local body = read_body()
+    if not body then
+        send_json({ status = "error", message = "No content" })
+        return
+    end
+
+    local decode_status, req = pcall(cjson.decode, body)
+    if not decode_status or not req then
+        send_json({ status = "error", message = "Invalid JSON" })
+        return
+    end
+
+    -- Validate CSRF Token
+    if not csrf.validate_token(req.csrf_token) then
+        send_json({ status = "error", message = "Invalid CSRF Token" })
+        return
+    end
+
+    local ttl = tonumber(req.ttl)
+    
+    if ttl and ttl > 0 then
+        -- Generate content
+        -- Using the specific chain format requested by user
+        local content = string.format([[
+    chain mangle_postrouting_ttl%d {
+        type filter hook postrouting priority 300; policy accept;
+        counter ip ttl set %d
+    }
+    chain mangle_prerouting_ttl%d {
+        type filter hook prerouting priority 300; policy accept;
+        counter ip ttl set %d
+    }
+]], ttl, ttl, ttl, ttl)
+
+        local f = io.open(NFT_FILE, "w")
+        if f then
+            f:write(content)
+            f:close()
+            os.execute("fw4 reload")
+            send_json({ status = "success", message = "TTL set to " .. ttl })
+        else
+            send_json({ status = "error", message = "Cannot write to nft file" })
+        end
+    else
+        -- Disable TTL (Set to 0 or null)
+        os.remove(NFT_FILE)
+        os.execute("fw4 reload")
+        send_json({ status = "success", message = "TTL disabled" })
+    end
+else
+    send_json({ status = "error", message = "Method not allowed" })
+end

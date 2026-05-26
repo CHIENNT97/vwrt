@@ -1,0 +1,202 @@
+#!/usr/bin/lua
+-- System Update Run API
+-- Params: type ("dashboard" or "firmware"), url (string), version (string)
+
+-- Dynamic Path Resolution
+local source = debug.getinfo(1).source
+local script_path = source:match("@?(.*[\\/])")
+if script_path then
+    local cgi_root = script_path:match("(.*cgi%-bin/)")
+    if cgi_root then
+        package.path = cgi_root .. "?.lua;" .. package.path
+    end
+end
+if not package.path:find("/www/vwrt/cgi-bin") then
+    package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+end
+
+local json = require("luci.jsonc")
+
+print("Content-Type: application/json")
+print("")
+
+local csrf = require("lib.csrf")
+
+-- Helper: Read POST data safely
+local function get_input()
+    local len = tonumber(os.getenv("CONTENT_LENGTH") or 0)
+    if len > 0 then
+        local raw = io.read(len)
+        return json.parse(raw) or {}
+    end
+    return {}
+end
+
+-- Read Input
+local input_data = get_input()
+
+-- CSRF Check
+local token = csrf.get_token_from_request() or csrf.get_token_from_body(input_data)
+if not csrf.validate_token(token) then
+    print(json.stringify({ status = "error", message = "CSRF Token không hợp lệ!" }))
+    os.exit()
+end
+
+local function run_update()
+    local data = input_data
+    local update_type = data.type or "dashboard"
+    local url = data.url or "https://github.com/CHIENNT97/vwrt/archive/refs/heads/main.tar.gz"
+    if update_type == "dashboard" then
+        url = "https://github.com/CHIENNT97/vwrt/archive/refs/heads/main.tar.gz"
+    end
+    local version = data.version or "latest"
+    
+    local log_file = "/tmp/update_debug.log"
+    local work_dir = "/tmp/update_work"
+    
+    -- Log start
+    os.execute("echo 'Update Start: Type=" .. update_type .. " URL=" .. url .. "' > " .. log_file)
+    
+    -- Clean work dir
+    os.execute("rm -rf " .. work_dir)
+    os.execute("mkdir -p " .. work_dir)
+    
+    -- Download file
+    local is_zip = url:match("%.zip$") or url:match("/zip/")
+    local out_file = work_dir .. (is_zip and "/update.zip" or "/update.tar.gz")
+    
+    local dl_cmd = "wget --no-check-certificate -O " .. out_file .. " '" .. url .. "' >> " .. log_file .. " 2>&1"
+    local dl_ret = os.execute(dl_cmd)
+    
+    -- Check file size
+    local f_check = io.open(out_file, "r")
+    local f_size = f_check and f_check:seek("end") or 0
+    if f_check then f_check:close() end
+    
+    os.execute("echo 'Download finished. Return: " .. tostring(dl_ret) .. ", Size: " .. tostring(f_size) .. " bytes' >> " .. log_file)
+
+    if dl_ret ~= 0 or f_size < 1024 then
+        print(json.stringify({ status = "error", message = "Lỗi tải file cập nhật (Size: " .. f_size .. ")." }))
+        return
+    end
+    
+    -- Extract
+    local ext_cmd = ""
+    if is_zip then
+        ext_cmd = "unzip -o " .. out_file .. " -d " .. work_dir .. " >> " .. log_file .. " 2>&1"
+    else
+        ext_cmd = "tar -xzf " .. out_file .. " -C " .. work_dir .. " >> " .. log_file .. " 2>&1"
+    end
+    
+    if os.execute(ext_cmd) ~= 0 then
+        print(json.stringify({ status = "error", message = "Lỗi giải nén file cập nhật (Zip=" .. tostring(is_zip) .. "). (Xem /tmp/update_debug.log)" }))
+        return
+    end
+    
+    -- Find source folder (Improved for both GitHub and Flat Tarball)
+    local source_folder = work_dir .. "/"
+    -- If cgi-bin or frontend doesn't exist in root, check subfolder
+    local check_cmd = "[ -d '" .. work_dir .. "/cgi-bin' ] || [ -d '" .. work_dir .. "/frontend' ]"
+    if os.execute(check_cmd) ~= 0 then
+        -- Not in root, find the first subdirectory (GitHub style)
+        local handle = io.popen("ls -d " .. work_dir .. "/*/ 2>/dev/null | head -n 1")
+        local sub = handle:read("*l")
+        handle:close()
+        if sub and sub ~= "" then
+            source_folder = sub
+        end
+    end
+    
+    os.execute("echo 'Source identified: " .. source_folder .. "' >> " .. log_file)
+    
+    -- Final check
+    if not source_folder or source_folder == "" then
+        print(json.stringify({ status = "error", message = "Không tìm thấy thư mục mã nguồn." }))
+        return
+    end
+    
+    -- Create installation script
+    local install_script = "/tmp/do_update.sh"
+    local f = io.open(install_script, "w")
+    
+    f:write("#!/bin/sh\n")
+    f:write("sleep 2\n")
+    
+    if update_type == "dashboard" then
+        -- Update Dashboard (Frontend + Backend APIs)
+        f:write("# Update Dashboard\n")
+        
+        -- Stop services and kill running instances
+        f:write("killall -9 mobile_poller.lua sms_sync.lua 2>/dev/null\n")
+        f:write("/etc/init.d/mobile_poller stop 2>/dev/null\n")
+        f:write("/etc/init.d/sms_sync stop 2>/dev/null\n")
+        
+        -- CLEAN INSTALL: Delete old files
+        f:write("rm -rf /www/vwrt/*\n")
+        
+        -- Copy Strategy: Flattened Structure (Standard)
+        -- We already identified the correct source_folder above, so just copy.
+        f:write("cp -rf '" .. source_folder .. "'* /www/vwrt/\n")
+        
+        -- CLEANUP DEV ARTIFACTS (Important for GitHub Source updates)
+        f:write("rm -rf /www/vwrt/.editorconfig /www/vwrt/.vscode /www/vwrt/.git* /www/vwrt/deploy_tool /www/vwrt/dist\n")
+        
+        -- Copy CGI endpoints to global /www/cgi-bin/
+        f:write("cp -rf /www/vwrt/cgi-bin/* /www/cgi-bin/ 2>/dev/null\n")
+        f:write("rm -rf /www/vwrt/cgi-bin\n")
+        f:write("ln -snf /www/cgi-bin /www/vwrt/cgi-bin\n")
+        
+        -- Copy init scripts to /etc/init.d/
+        f:write("cp -f /www/vwrt/services/init.d/mobile_poller /etc/init.d/ 2>/dev/null\n")
+        f:write("cp -f /www/vwrt/services/init.d/sms_sync /etc/init.d/ 2>/dev/null\n")
+        f:write("chmod +x /etc/init.d/mobile_poller /etc/init.d/sms_sync 2>/dev/null\n")
+        
+        -- Normalize line endings (CRLF to LF) for shell and lua scripts
+        f:write("sed -i 's/\\r$//' /etc/init.d/mobile_poller /etc/init.d/sms_sync /www/vwrt/services/at_cmd.sh 2>/dev/null\n")
+        f:write("find /www/vwrt/ -type f -name '*.sh' -o -name '*.lua' 2>/dev/null | xargs sed -i 's/\\r$//' 2>/dev/null\n")
+        f:write("find /www/cgi-bin/ -type f 2>/dev/null | xargs sed -i 's/\\r$//' 2>/dev/null\n")
+        
+        -- Fix permissions
+        f:write("chmod -R 755 /www/vwrt\n")
+        f:write("chmod -R +x /www/cgi-bin/ 2>/dev/null\n")
+        f:write("chmod -R +x /www/vwrt/services/ 2>/dev/null\n")
+        
+        -- Recreate Symlinks for LuCI (Absolute)
+        f:write("ln -snf /www/luci-static /www/vwrt/luci-static\n")
+        
+        -- Restart services if they exist
+        f:write("/etc/init.d/mobile_poller enable 2>/dev/null\n")
+        f:write("/etc/init.d/sms_sync enable 2>/dev/null\n")
+        f:write("/etc/init.d/mobile_poller start 2>/dev/null\n")
+        f:write("/etc/init.d/sms_sync start 2>/dev/null\n")
+        
+        -- CONFIG: Set Dashboard as Default on Port 80
+        f:write("uci set uhttpd.main.home='/www/vwrt'\n")
+        f:write("uci commit uhttpd\n")
+        f:write("/etc/init.d/uhttpd restart\n")
+        
+        -- Cleanup
+        f:write("rm -rf " .. work_dir .. "\n")
+        
+        -- Sync and Reboot
+        f:write("sync\n")
+        f:write("reboot\n")
+        
+    elseif update_type == "firmware" then
+        -- Firmware update logic (using sysupgrade)
+        -- Assumes URL points to a sysupgrade image
+        f:write("sysupgrade -v '" .. work_dir .. "/update.tar.gz'\n") 
+    end
+    
+    f:close()
+    
+    os.execute("chmod +x " .. install_script)
+    os.execute("sh " .. install_script .. " >/dev/null 2>&1 &")
+    
+    print(json.stringify({ status = "success", message = "Đang cập nhật " .. update_type .. "... Thiết bị sẽ khởi động lại." }))
+end
+
+local ok, err = pcall(run_update)
+if not ok then
+    print(json.stringify({ status = "error", message = tostring(err) }))
+end

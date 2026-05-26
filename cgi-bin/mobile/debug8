@@ -1,0 +1,9 @@
+#!/usr/bin/lua
+local cjson = require "cjson"
+print("Content-type: application/json\n\n")
+
+local f = io.popen("/www/vwrt/services/at_cmd.sh /dev/ttyUSB3 'AT+CSQ'")
+local res = f:read("*a")
+f:close()
+
+print(cjson.encode({ at_res = res }))

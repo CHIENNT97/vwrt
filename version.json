@@ -1,0 +1,7 @@
+{
+    "dashboard": {
+        "version": "1.1.6",
+        "url": "https://github.com/CHIENNT97/vwrt/archive/refs/heads/main.tar.gz",
+        "log": "- Fix: Sửa lỗi mất IP ngẫu nhiên do modem bị treo (Deadlock).\n- Thêm cơ chế Hard Reset (Restart 5G) nếu bị kẹt Pending quá 60s.\n- Sửa lỗi cú pháp atc.sh khiến kết nối thất bại.\n- Tự động đồng bộ IP và trạng thái mạng (Self-healing)."
+    }
+}

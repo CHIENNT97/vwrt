@@ -1,0 +1,283 @@
+#!/usr/bin/lua
+
+-- Helper to detect script path and set package.path dynamically
+-- This allows the app to run from any directory
+local source = debug.getinfo(1).source
+local script_path = source:match("@?(.*[\\/])")
+if script_path then
+    -- Assuming structure is .../cgi-bin/api/module/script
+    -- We want to add .../cgi-bin/ to package.path
+    local cgi_root = script_path:match("(.*cgi%-bin/)")
+    if cgi_root then
+        package.path = cgi_root .. "?.lua;" .. package.path
+        -- Add parent /www/vwrt/ for lib modules
+        local vwrt_root = cgi_root:match("(.*/)cgi%-bin/")
+        if vwrt_root then
+            package.path = vwrt_root .. "?.lua;" .. vwrt_root .. "?/init.lua;" .. package.path
+        end
+    end
+end
+-- Legacy fallback
+if not package.path:find("/www/vwrt") then
+    package.path = "/www/vwrt/?.lua;/www/vwrt/cgi-bin/?.lua;" .. package.path
+end
+
+local cjson = require "cjson"
+local constants = require "lib.constants"
+local tmp_file_cpu = constants.PATHS.CPU_STAT
+
+function read_file(path)
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local content = f:read("*all")
+    f:close()
+    return content
+end
+
+function write_file(path, content)
+    local f = io.open(path, "w")
+    if f then f:write(content) f:close() end
+end
+
+-- === HELPERS ===
+function sanitize_utf8(str)
+    if not str then return "" end
+    -- Remove non-printable characters (keep newline/tab)
+    return str:gsub("[%z\1-\8\11-\31\127-\255]", "") 
+end
+
+function get_cpu_usage()
+    local content = read_file("/proc/stat")
+    if not content then return 0 end
+    local line = content:match("cpu%s+(.+)")
+    if not line then return 0 end
+    local u, n, s, i, io, irq, sirq = line:match("(%d+)%s+(%d+)%s+(%d+)%s+(%d+)%s+(%d+)%s+(%d+)%s+(%d+)")
+    if not u then return 0 end
+    local current_total = u + n + s + i + io + irq + sirq
+    local current_idle = i + io
+    local last_data = read_file(tmp_file_cpu)
+    local last_total, last_idle = 0, 0
+    if last_data then
+        last_total, last_idle = last_data:match("(%d+)%s+(%d+)")
+        last_total = tonumber(last_total) or 0
+        last_idle = tonumber(last_idle) or 0
+    end
+    write_file(tmp_file_cpu, string.format("%.0f %.0f", current_total, current_idle))
+    if last_total == 0 then return 0 end
+    local diff_total = current_total - last_total
+    local diff_idle = current_idle - last_idle
+    if diff_total <= 0 then return 0 end
+    return math.floor(((diff_total - diff_idle) / diff_total) * 100)
+end
+
+function get_memory()
+    local content = read_file("/proc/meminfo") or ""
+    local total = tonumber(content:match("MemTotal:%s*(%d+)")) or 1
+    local available = tonumber(content:match("MemAvailable:%s*(%d+)"))
+    if not available then
+        local free = tonumber(content:match("MemFree:%s*(%d+)")) or 0
+        local buffers = tonumber(content:match("Buffers:%s*(%d+)")) or 0
+        local cached = tonumber(content:match("Cached:%s*(%d+)")) or 0
+        available = free + buffers + cached
+    end
+    local used = total - available
+    return { total = total * 1024, used = used * 1024, percent = math.floor((used / total) * 100) }
+end
+
+function get_rom()
+    local cache_path = "/tmp/vwrt_rom_stats"
+    local f_cache = io.open(cache_path, "r")
+    if f_cache then
+        local line = f_cache:read("*line")
+        f_cache:close()
+        if line then
+            local ts, total, used, percent = line:match("(%d+)%s+(%d+)%s+(%d+)%s+(%d+)")
+            if ts and total and used and percent then
+                if os.time() - tonumber(ts) < 60 then
+                    return { total = tonumber(total), used = tonumber(used), percent = tonumber(percent) }
+                end
+            end
+        end
+    end
+
+    -- Cache missed or expired
+    local handle = io.popen("df /overlay | tail -n 1")
+    local result = handle:read("*a")
+    handle:close()
+    local size, used, avail, pcent = result:match("%S+%s+(%d+)%s+(%d+)%s+(%d+)%s+(%d+)%%")
+    if not size then 
+         handle = io.popen("df / | tail -n 1")
+         result = handle:read("*a")
+         handle:close()
+         size, used, avail, pcent = result:match("%S+%s+(%d+)%s+(%d+)%s+(%d+)%s+(%d+)%%")
+    end
+    
+    local rom_data = {
+        total = (tonumber(size) or 0) * 1024,
+        used = (tonumber(used) or 0) * 1024,
+        percent = tonumber(pcent) or 0
+    }
+    
+    -- Write to cache
+    local f_w = io.open(cache_path, "w")
+    if f_w then
+        f_w:write(string.format("%.0f %.0f %.0f %.0f\n", os.time(), rom_data.total, rom_data.used, rom_data.percent))
+        f_w:close()
+    end
+    
+    return rom_data
+end
+
+function get_other_sys_info()
+    local up_content = read_file("/proc/uptime") or "0"
+    local uptime = tonumber(up_content:match("^(%d+)")) or 0
+    
+    local degree = 0
+    
+    -- Thermal check (Pure Lua, no process fork!)
+    for i = 0, 3 do
+        local content = read_file("/sys/class/thermal/thermal_zone" .. i .. "/temp")
+        if content then
+            local val = tonumber(content) or 0
+            if val > 1000 then val = val / 1000 end
+            if val > 0 then degree = val break end
+        end
+    end
+    
+    -- Dynamic WAN Traffic Aggregation
+    local wan_interfaces = {}
+    local total_lan = 0
+    local lan_iface_list = ""
+
+    -- Read WAN interfaces cache (TTL 60s)
+    local wan_cache_path = "/tmp/vwrt_wan_interfaces"
+    local f_wan = io.open(wan_cache_path, "r")
+    local cached_list = nil
+    if f_wan then
+        local line = f_wan:read("*line")
+        f_wan:close()
+        if line then
+            local ts, list = line:match("(%d+)%s+(%S*)")
+            if ts then
+                if os.time() - tonumber(ts) < 60 then
+                    cached_list = list or ""
+                end
+            end
+        end
+    end
+
+    if cached_list then
+        lan_iface_list = cached_list
+        for iface in lan_iface_list:gmatch("[^+]+") do
+            wan_interfaces[iface] = true
+        end
+    else
+        -- 1. Find networks in 'wan' zone
+        local zone_net_handle = io.popen("uci -q get firewall.@zone[1].network")
+        if zone_net_handle then
+            local nets = zone_net_handle:read("*all")
+            zone_net_handle:close()
+            
+            -- 2. Get l3_device for each network from ubus
+            if nets and nets ~= "" then
+                local ubus_handle = io.popen("ubus call network.interface dump")
+                if ubus_handle then
+                    local ubus_json = ubus_handle:read("*all")
+                    ubus_handle:close()
+                    
+                    for net in nets:gmatch("%S+") do
+                        local l3_dev = ubus_json:match('"interface":%s*"' .. net .. '".-"l3_device":%s*"([^"]+)"')
+                        if l3_dev and l3_dev ~= "" then
+                            wan_interfaces[l3_dev] = true
+                        end
+                    end
+                end
+            end
+        end
+        
+        -- Build the list string
+        for iface, _ in pairs(wan_interfaces) do
+            lan_iface_list = lan_iface_list .. (lan_iface_list == "" and "" or "+") .. iface
+        end
+        
+        -- Write to cache
+        local f_w = io.open(wan_cache_path, "w")
+        if f_w then
+            f_w:write(string.format("%.0f %s\n", os.time(), lan_iface_list))
+            f_w:close()
+        end
+    end
+
+    -- 3. Sum traffic from identified interfaces
+    local found_wan = false
+    for iface, _ in pairs(wan_interfaces) do
+        local rx = read_file("/sys/class/net/" .. iface .. "/statistics/rx_bytes")
+        local tx = read_file("/sys/class/net/" .. iface .. "/statistics/tx_bytes")
+        if rx or tx then
+            total_lan = total_lan + (tonumber(rx) or 0) + (tonumber(tx) or 0)
+            found_wan = true
+        end
+    end
+
+    -- 4. Fallback to br-lan if no WAN traffic found
+    if not found_wan then
+        local fallback_iface = "br-lan"
+        if not io.open("/sys/class/net/" .. fallback_iface) then
+            fallback_iface = "eth0"
+        end
+        local rx = read_file("/sys/class/net/" .. fallback_iface .. "/statistics/rx_bytes")
+        local tx = read_file("/sys/class/net/" .. fallback_iface .. "/statistics/tx_bytes")
+        total_lan = (tonumber(rx) or 0) + (tonumber(tx) or 0)
+        lan_iface_list = fallback_iface
+    end
+    
+    -- Model
+    local model = "OpenWrt Router"
+    local f_mod = io.open("/tmp/sysinfo/model", "r")
+    if f_mod then model = f_mod:read("*all"):gsub("\n","") f_mod:close() end
+
+    return { uptime = uptime, temp = degree, lan_total = total_lan, model = model, interface = lan_iface_list }
+end
+
+-- === DATA COLLECTOR ===
+
+local sys_extra = get_other_sys_info()
+local sys_data = {
+    model = sys_extra.model,
+    cpu = get_cpu_usage(),
+    ram = get_memory(),
+    rom = get_rom(),
+    uptime = sys_extra.uptime,
+    temp = sys_extra.temp,
+    lan_total = sys_extra.lan_total
+}
+
+-- Mobile Data
+local mob_data = {}
+local mob_content = read_file("/tmp/vwrt_mobile.json")
+if mob_content and mob_content ~= "" then
+    local ok, parsed = pcall(cjson.decode, mob_content)
+    if ok and parsed then 
+        mob_data = parsed 
+        -- Sanitize Mobile Strings
+        if mob_data.operator_name then mob_data.operator_name = sanitize_utf8(mob_data.operator_name) end
+        if mob_data.mode then mob_data.mode = sanitize_utf8(mob_data.mode) end
+
+        -- Fallback Temp if system temp is 0
+        if sys_data.temp == 0 and parsed.mtemp then
+             sys_data.temp = tonumber(parsed.mtemp) or 0
+        end
+    end
+end
+
+-- Sanitize System Strings
+sys_data.model = sanitize_utf8(sys_data.model)
+
+local final = {
+    sys = sys_data,
+    mob = mob_data
+}
+
+print("Content-type: application/json\n\n")
+local ok, json = pcall(cjson.encode, final)
+if ok then print(json) else print("{}") end

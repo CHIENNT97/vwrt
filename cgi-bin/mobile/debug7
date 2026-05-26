@@ -1,0 +1,14 @@
+#!/usr/bin/lua
+local cjson = require "cjson"
+local function exec(cmd)
+    local f = io.popen(cmd)
+    if not f then return nil end
+    local content = f:read("*all")
+    f:close()
+    return content
+end
+print("Content-type: application/json\n\n")
+local out2 = exec("/usr/bin/sms_tool -d /dev/ttyUSB2 at 'AT+GTCCINFO?' 2>/dev/null")
+local out1 = exec("/usr/bin/sms_tool -d /dev/ttyUSB1 at 'AT+GTCCINFO?' 2>/dev/null")
+local out4 = exec("/usr/bin/sms_tool -d /dev/ttyUSB4 at 'AT+GTCCINFO?' 2>/dev/null")
+print(cjson.encode({ tty2 = out2, tty1 = out1, tty4 = out4 }))

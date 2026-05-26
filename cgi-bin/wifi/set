@@ -1,0 +1,76 @@
+#!/usr/bin/lua
+
+local cjson = require "cjson"
+
+-- Add project path to package.path
+-- Dynamic Path Resolution
+local source = debug.getinfo(1).source
+local script_path = source:match("@?(.*[\\/])")
+if script_path then
+    local cgi_root = script_path:match("(.*cgi%-bin/)")
+    if cgi_root then
+        package.path = cgi_root .. "?.lua;" .. package.path
+    end
+end
+if not package.path:find("/www/vwrt/cgi-bin") then
+    package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+end
+
+local csrf = require "lib.csrf"
+
+local len = tonumber(os.getenv("CONTENT_LENGTH") or 0)
+local content = io.read(len)
+local input = cjson.decode(content)
+
+print("Content-type: application/json\n\n")
+
+-- 1. CSRF Check
+local token = csrf.get_token_from_request() or csrf.get_token_from_body(input)
+if not csrf.validate_token(token) then
+    print('{"status": "error", "message": "CSRF Token khÃ´ng há»£p lá»‡!"}')
+    os.exit()
+end
+
+if not input.section or not input.device then
+    print('{"status": "error", "message": "Thiáº¿u thÃ´ng tin thiáº¿t bá»‹"}')
+    os.exit()
+end
+
+function safe_arg(str) 
+    if not str then return "''" end
+    return "'" .. str:gsub("'", "'\\''") .. "'" 
+end
+
+local iface_sec = safe_arg(input.section)
+local dev_sec = safe_arg(input.device)
+local ssid = safe_arg(input.ssid)
+local key_val = input.key or ""
+local key = safe_arg(key_val)
+local channel = safe_arg(input.channel)
+local htmode = safe_arg(input.htmode)
+local disabled = input.enabled and "0" or "1"
+
+os.execute("uci set wireless." .. dev_sec .. ".channel=" .. channel)
+os.execute("uci set wireless." .. dev_sec .. ".htmode=" .. htmode)
+
+os.execute("uci set wireless." .. iface_sec .. ".ssid=" .. ssid)
+os.execute("uci set wireless." .. iface_sec .. ".disabled=" .. disabled)
+
+if key_val and #key_val > 0 then
+    if #key_val < 8 then
+        print('{"status": "error", "message": "Máº­t kháº©u Wifi pháº£i tá»« 8 kÃ½ tá»± trá»Ÿ lÃªn!"}')
+        os.exit()
+    end
+    os.execute("uci set wireless." .. iface_sec .. ".encryption='psk-mixed'")
+    os.execute("uci set wireless." .. iface_sec .. ".key=" .. key)
+else
+    os.execute("uci set wireless." .. iface_sec .. ".encryption='none'")
+    os.execute("uci set wireless." .. iface_sec .. ".key=''")
+end
+
+os.execute("uci commit wireless")
+
+print('{"status": "success", "message": "ÄÃ£ lÆ°u! Wifi sáº½ khá»Ÿi Ä‘á»™ng láº¡i sau 1 giÃ¢y."}')
+io.flush()
+
+os.execute("(sleep 1; wifi reload) >/dev/null 2>&1 &")

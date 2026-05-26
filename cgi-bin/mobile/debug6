@@ -1,0 +1,12 @@
+#!/usr/bin/lua
+local cjson = require "cjson"
+local function exec(cmd)
+    local f = io.popen(cmd)
+    if not f then return nil end
+    local content = f:read("*all")
+    f:close()
+    return content
+end
+print("Content-type: application/json\n\n")
+local tty = exec("ls -l /dev/ttyUSB* 2>/dev/null")
+print(cjson.encode({ tty = tty }))

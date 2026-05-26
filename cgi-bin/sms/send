@@ -1,0 +1,135 @@
+#!/usr/bin/lua
+print("Content-type: application/json\n")
+
+local script_path = "/www/vwrt/cgi-bin/"
+package.path = script_path .. "?.lua;" .. package.path
+
+local json = require "luci.jsonc"
+
+-- Helper: Read POST data safely
+local function get_input()
+    local len = tonumber(os.getenv("CONTENT_LENGTH") or 0)
+    if len > 0 then
+        local raw = io.read(len)
+        return json.parse(raw) or {}
+    end
+    return {}
+end
+
+local input_data = get_input()
+
+-- ===== CSRF PROTECTION =====
+local csrf = require "lib.csrf"
+local token = csrf.get_token_from_request() or csrf.get_token_from_body(input_data)
+
+if not csrf.validate_token(token) then
+    print(json.stringify({status="error", message="CSRF token không hợp lệ hoặc thiếu"}))
+    os.exit()
+end
+
+
+-- ===== RATE LIMITING =====
+local rate_limit = require "lib.rate_limit"
+local client_ip = rate_limit.get_client_ip()
+
+local allowed, remaining, reset_at = rate_limit.check_sms(client_ip)
+if not allowed then
+    local wait_seconds = reset_at - os.time()
+    print(json.stringify({
+        status="error", 
+        message=string.format("Đã gửi quá nhiều SMS. Vui lòng chờ %d giây.", wait_seconds),
+        retry_after=wait_seconds
+    }))
+    os.exit()
+end
+
+-- ===== INPUT VALIDATION =====
+-- input_data is already parsed JSON table
+local data = input_data
+
+if not data or not data.number or not data.text then
+    print(json.stringify({status="error", message="Missing number or text"}))
+    os.exit()
+end
+
+-- Chống Command Injection: validate inputs trước khi xử lý
+local security = require "lib.security"
+
+if not security.is_valid_phone(data.number) then
+    print(json.stringify({status="error", message="Số điện thoại không hợp lệ"}))
+    os.exit()
+end
+
+if type(data.text) ~= "string" or data.text == "" or #data.text > 1600 then
+    print(json.stringify({status="error", message="Nội dung SMS không hợp lệ (trống hoặc quá dài)"}))
+    os.exit()
+end
+
+-- ===== SEND SMS =====
+local function get_driver()
+    local q_handle = io.popen("uci -q get qmodem.main.enable_dial 2>/dev/null")
+    if q_handle then
+        local q_val = q_handle:read("*all")
+        q_handle:close()
+        if q_val and q_val:gsub("%s+", "") == "1" then
+            return require "drivers.fm350"
+        end
+    end
+
+    local handle = io.popen("uci show network | grep '.proto=.atc.'")
+    if handle then
+        local content = handle:read("*all")
+        handle:close()
+        if content and content ~= "" then
+             return require "drivers.fm350"
+        end
+    end
+    return require "drivers.mmcli"
+end
+
+local config = { driver = "dynamic", modem_index = "0" }
+local driver_lib = get_driver()
+
+local result = driver_lib.send_sms(config, data.number, data.text)
+
+-- Update Archive immediately on success for instant UI feedback
+if result.status == "success" then
+    local sms_storage = require "lib.sms_storage"
+    local sms_util = require "lib.sms_util"
+    
+    sms_storage.update(function(archive)
+        local phone = data.number
+        if not archive.conversations[phone] then
+            archive.conversations[phone] = { messages = {}, unread = 0 }
+        end
+        
+        local timestamp = os.date("%Y-%m-%dT%H:%M:%S")
+        -- Create a fingerprint that will match when the message is read back from modem
+        local fingerprint = sms_util.get_fingerprint({
+            number = data.number,
+            time = timestamp:gsub("T", " "), -- Modem usually uses spaces
+            text = data.text
+        })
+        local msg_id = "sent_" .. os.time()
+        
+        table.insert(archive.conversations[phone].messages, {
+            id = msg_id,
+            fingerprint = fingerprint,
+            timestamp = timestamp,
+            content = data.text,
+            direction = "sent", -- Explicit direction
+            read = true,
+            important = false
+        })
+        archive.conversations[phone].last_message = data.text
+        archive.conversations[phone].last_time = timestamp
+        
+        -- Mark as synced to prevent duplicate from sync service
+        archive.synced_ids[fingerprint] = true
+        archive.synced_ids[msg_id] = true
+        -- Also mark potential modem index to skip
+        archive.synced_ids["LOCAL_" .. os.time()] = true
+    end)
+end
+
+print(json.stringify(result))

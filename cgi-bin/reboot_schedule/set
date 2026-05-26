@@ -1,0 +1,176 @@
+#!/usr/bin/lua
+-- Reboot Schedule Set API
+
+-- DEBUG LOGGING (Re-enabled)
+local function log(msg)
+    local f = io.open("/tmp/vwrt_debug.log", "a")
+    if f then
+        f:write(os.date() .. " [reboot_schedule] " .. tostring(msg) .. "\n")
+        f:close()
+    end
+end
+log("Script started")
+
+local script_path = "/www/vwrt/cgi-bin/"
+package.path = script_path .. "?.lua;" .. package.path
+
+local json = require("luci.jsonc")
+local csrf = require("lib.csrf")
+
+print("Content-Type: application/json")
+print("")
+
+local schedule_file = "/etc/vwrt_reboot_schedule.json"
+local cron_file = "/etc/crontabs/root"
+
+local function parse_post_data()
+    local content_length = tonumber(os.getenv("CONTENT_LENGTH") or 0)
+    if content_length > 0 then
+        local raw = io.read(content_length)
+        log("Raw POST data: " .. tostring(raw))
+        return json.parse(raw) or {}
+    end
+    return {}
+end
+
+-- Parse POST data FIRST (needed for CSRF check)
+local post_data = parse_post_data()
+
+-- CSRF Check (from POST body since uhttpd strips custom headers)
+local token = csrf.get_token_from_body(post_data)
+log("Token received: " .. tostring(token))
+
+if not csrf.validate_token(token) then
+    log("CSRF Invalid")
+    print(json.stringify({ success = false, error = "CSRF Token không hợp lệ!" }))
+    os.exit()
+end
+log("CSRF Valid")
+
+local function read_schedules()
+    local schedules = {}
+    local f = io.open(schedule_file, "r")
+    if f then
+        local content = f:read("*all")
+        f:close()
+        local data = json.parse(content)
+        if data and data.schedules then
+            schedules = data.schedules
+        end
+    end
+    return schedules
+end
+
+local function save_schedules(schedules)
+    local f = io.open(schedule_file, "w")
+    if f then
+        f:write(json.stringify({ schedules = schedules }))
+        f:close()
+        return true
+    end
+    return false
+end
+
+local function regenerate_cron()
+    local schedules = read_schedules()
+    
+    -- Read existing cron, remove vwrt_reboot entries
+    local existing_entries = {}
+    local f = io.open(cron_file, "r")
+    if f then
+        for line in f:lines() do
+            if not line:match("vwrt_reboot") then
+                table.insert(existing_entries, line)
+            end
+        end
+        f:close()
+    end
+    
+    -- Add new entries for enabled schedules
+    for _, schedule in ipairs(schedules) do
+        if schedule.active then
+            -- Time entry
+            if schedule.time and schedule.time ~= "" then
+                local hour, min = schedule.time:match("(%d+):(%d+)")
+                if hour and min then
+                    local days = schedule.days or "*"
+                    -- Command: /sbin/reboot
+                    local cron_entry = string.format("%s %s * * %s /sbin/reboot # vwrt_reboot %s",
+                        min, hour, days, schedule.id or "")
+                    table.insert(existing_entries, cron_entry)
+                end
+            end
+        end
+    end
+    
+    -- Write back to cron file
+    f = io.open(cron_file, "w")
+    if f then
+        for _, line in ipairs(existing_entries) do
+            f:write(line .. "\n")
+        end
+        f:close()
+    end
+    
+    -- Reload cron
+    os.execute("/etc/init.d/cron restart >/dev/null 2>&1 &")
+end
+
+local function set_schedule()
+    local data = post_data -- Use already-parsed data from above
+    local action = data.action or ""
+    
+    if action == "add" then
+        local schedules = read_schedules()
+        local new_schedule = {
+            id = tostring(os.time()),
+            time = data.time or "",
+            days = data.days or "*",
+            active = true
+        }
+        table.insert(schedules, new_schedule)
+        save_schedules(schedules)
+        regenerate_cron()
+        print(json.stringify({ success = true, message = "Đã thêm lịch khởi động lại." }))
+        
+    elseif action == "delete" then
+        if not data.id then
+            print(json.stringify({ success = false, error = "ID không hợp lệ." }))
+            return
+        end
+        local schedules = read_schedules()
+        local new_schedules = {}
+        for _, s in ipairs(schedules) do
+            if s.id ~= data.id then
+                table.insert(new_schedules, s)
+            end
+        end
+        save_schedules(new_schedules)
+        regenerate_cron()
+        print(json.stringify({ success = true, message = "Đã xóa lịch." }))
+        
+    elseif action == "toggle" then
+        if not data.id then
+            print(json.stringify({ success = false, error = "ID không hợp lệ." }))
+            return
+        end
+        local schedules = read_schedules()
+        for i, s in ipairs(schedules) do
+            if s.id == data.id then
+                schedules[i].active = not schedules[i].active
+                break
+            end
+        end
+        save_schedules(schedules)
+        regenerate_cron()
+        print(json.stringify({ success = true, message = "Đã cập nhật trạng thái." }))
+        
+    else
+        print(json.stringify({ success = false, error = "Action không hợp lệ." }))
+    end
+end
+
+local ok, err = pcall(set_schedule)
+if not ok then
+    print(json.stringify({ success = false, error = tostring(err) }))
+end

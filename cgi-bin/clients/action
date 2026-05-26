@@ -1,0 +1,229 @@
+#!/usr/bin/lua
+
+local cjson = require "cjson"
+-- Dynamic Path Resolution
+local source = debug.getinfo(1).source
+local script_path = source:match("@?(.*[\\/])")
+if script_path then
+    local cgi_root = script_path:match("(.*cgi%-bin/)")
+    if cgi_root then
+        package.path = cgi_root .. "?.lua;" .. package.path
+    end
+end
+if not package.path:find("/www/vwrt/cgi-bin") then
+    package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+end
+
+local csrf = require "lib.csrf"
+local security = require "lib.security"
+local uci = require("luci.model.uci").cursor()
+
+-- Ensure config file exists
+if not io.open("/etc/config/vwrt", "r") then
+    os.execute("touch /etc/config/vwrt")
+    uci:commit("vwrt") -- Init config
+end
+
+print("Content-Type: application/json\n")
+
+local function exec(cmd)
+    local f = io.popen(cmd)
+    if not f then return nil end
+    local c = f:read("*all")
+    f:close()
+    if c then return c:gsub("\n", "") else return nil end
+end
+
+local function run(cmd)
+    return os.execute(cmd)
+end
+
+-- Helper to find wireless interface dynamically by band/frequency
+local function get_wireless_iface_by_band(band_type)
+    -- band_type: "5G" or "2.4G"
+    local handle = io.popen("iwinfo | grep -E 'ESSID' | cut -d ' ' -f 1")
+    if handle then
+        for line in handle:lines() do
+            local ifname_cand = line:match("%S+")
+            if ifname_cand and ifname_cand ~= "" then
+                -- Check frequency/channel
+                local freq_info = exec("iwinfo " .. ifname_cand .. " info | grep 'Channel'")
+                if freq_info then
+                    if band_type == "5G" and (freq_info:find("5.%d+ GHz") or freq_info:find("Unknown")) then
+                        -- "Unknown" on some drivers like mt76 for 5G
+                        return ifname_cand
+                    elseif band_type == "2.4G" and freq_info:find("2.4%d+ GHz") then
+                        return ifname_cand
+                    end
+                end
+            end
+        end
+        handle:close()
+    end
+    return nil -- caller fallback
+end
+
+local function get_input()
+    local content_length = tonumber(os.getenv("CONTENT_LENGTH") or 0)
+    if content_length > 0 then
+        local raw = io.read(content_length)
+        return cjson.decode(raw)
+    end
+    return nil
+end
+
+local input = get_input()
+if not input then
+    print(cjson.encode({ status = "error", message = "Invalid request" }))
+    os.exit()
+end
+
+-- CSRF Check
+local token = input.csrf_token or os.getenv("HTTP_X_CSRF_TOKEN")
+if not csrf.validate_token(token) then
+    print(cjson.encode({ status = "error", message = "CSRF Token không hợp lệ!" }))
+    os.exit()
+end
+
+local action = input.action
+local mac = input.mac and input.mac:lower()
+
+if not action or not mac then
+    print(cjson.encode({ status = "error", message = "Missing parameters" }))
+    os.exit()
+end
+
+-- Validate MAC
+if not mac:match("^%x%x:%x%x:%x%x:%x%x:%x%x:%x%x$") then
+    print(cjson.encode({ status = "error", message = "MAC Address không hợp lệ" }))
+    os.exit()
+end
+
+local function init_firewall()
+    -- IPv4
+    run("iptables -N VWRT_BLOCK 2>/dev/null")
+    run("iptables -C FORWARD -j VWRT_BLOCK 2>/dev/null || iptables -I FORWARD -j VWRT_BLOCK")
+    -- IPv6 (Critical to prevent bypass)
+    run("ip6tables -N VWRT_BLOCK 2>/dev/null")
+    run("ip6tables -C FORWARD -j VWRT_BLOCK 2>/dev/null || ip6tables -I FORWARD -j VWRT_BLOCK")
+end
+
+local function handle_block(target_mac, do_block)
+    -- Ensure firewall structure exists
+    init_firewall()
+
+    local changed = false
+    
+    -- Ensure custom config exists
+    uci:set("vwrt", "clients", "app")
+    
+    local list = uci:get("vwrt", "clients", "blocked") or {}
+    if type(list) == "string" then list = {list} end
+    
+    local new_list = {}
+    local found = false
+    
+    for _, m in ipairs(list) do
+        if m:lower() == target_mac then
+            found = true
+            if not do_block then -- unzip: skip
+            else table.insert(new_list, m) end
+        else
+            table.insert(new_list, m)
+        end
+    end
+    
+    if do_block and not found then
+        table.insert(new_list, target_mac)
+        uci:set("vwrt", "clients", "blocked", new_list)
+        changed = true
+    elseif not do_block and found then
+        if #new_list == 0 then
+            uci:delete("vwrt", "clients", "blocked")
+        else
+            uci:set("vwrt", "clients", "blocked", new_list)
+        end
+        changed = true
+    end
+    
+    -- ALWAYS execute runtime enforcement
+    -- 1. IPTables (Universal Net Block - IPv4 & IPv6)
+    if do_block then
+        run(string.format("iptables -I VWRT_BLOCK -m mac --mac-source %s -j DROP 2>/dev/null", target_mac))
+        run(string.format("ip6tables -I VWRT_BLOCK -m mac --mac-source %s -j DROP 2>/dev/null", target_mac))
+    else
+        -- Remove rules efficiently
+        run(string.format("iptables -D VWRT_BLOCK -m mac --mac-source %s -j DROP 2>/dev/null", target_mac))
+        run(string.format("ip6tables -D VWRT_BLOCK -m mac --mac-source %s -j DROP 2>/dev/null", target_mac))
+    end
+
+    -- 2. Wireless Driver Specific (Kick/Auth Block)
+    local should_cleanup = (not do_block) and (#new_list == 0)
+    
+    -- Detect active hostapd interfaces from ubus
+    local hostapd_ubus = exec("ubus list hostapd.*") or ""
+    local active_ifaces = {}
+    for ifname in hostapd_ubus:gmatch("hostapd%.(%S+)") do
+        table.insert(active_ifaces, ifname)
+    end
+    
+    -- Fallback: If ubus fails, try UCI traversal
+    if #active_ifaces == 0 then
+        uci:foreach("wireless", "wifi-iface", function(s)
+            local ifname = s.ifname or exec("iwinfo | grep -E 'ESSID' | cut -d ' ' -f 1") -- crude fallback
+            if ifname then table.insert(active_ifaces, ifname) end
+        end)
+    end
+
+    for _, ifname in ipairs(active_ifaces) do
+        -- Driver Abstraction Layer
+        if do_block then
+            -- A. Try UBUS (Kick + Ban for 1 hour)
+            run(string.format("ubus call hostapd.%s del_client '{\"addr\":\"%s\", \"reason\":1, \"deauth\":true, \"ban_time\":3600}' 2>/dev/null", ifname, target_mac))
+            
+            -- B. Try iwpriv (MediaTek Proprietary)
+            run(string.format("iwpriv %s set ACLAddEntry='%s' 2>/dev/null", ifname, target_mac))
+            run(string.format("iwpriv %s set AccessPolicy=2 2>/dev/null", ifname))
+            run(string.format("iwpriv %s set Disconnect='%s' 2>/dev/null", ifname, target_mac))
+            
+            -- C. Try hostapd_cli (Legacy/Standard)
+            local socket_path = "/var/run/hostapd/" .. ifname
+            run(string.format("hostapd_cli -p %s deny_mac %s 2>/dev/null", socket_path, target_mac))
+            run(string.format("hostapd_cli -p %s deauthenticate %s 2>/dev/null", socket_path, target_mac))
+        else
+            -- UNBLOCK Logic
+            run(string.format("ubus call hostapd.%s del_client '{\"addr\":\"%s\", \"ban_time\":0}' 2>/dev/null", ifname, target_mac))
+            
+            if should_cleanup then
+                run(string.format("iwpriv %s set AccessPolicy=0 2>/dev/null", ifname))
+                run(string.format("iwpriv %s set ACLClearAll=1 2>/dev/null", ifname))
+            else
+                run(string.format("iwpriv %s set ACLDelEntry='%s' 2>/dev/null", ifname, target_mac))
+            end
+            
+            local socket_path = "/var/run/hostapd/" .. ifname
+            run(string.format("hostapd_cli -p %s unban %s 2>/dev/null", socket_path, target_mac))
+        end
+    end
+    
+    if changed then
+        uci:commit("vwrt")
+    end
+    return true
+end
+
+if action == "block" then
+    if handle_block(mac, true) then
+        print(cjson.encode({ status = "success", message = "Đã chặn thiết bị " .. mac }))
+    else
+        print(cjson.encode({ status = "success", message = "Thiết bị đã bị chặn từ trước" }))
+    end
+elseif action == "unblock" then
+    if handle_block(mac, false) then
+        print(cjson.encode({ status = "success", message = "Đã bỏ chặn thiết bị " .. mac }))
+    else
+        print(cjson.encode({ status = "success", message = "Thiết bị không nằm trong danh sách chặn" }))
+    end
+else
+    print(cjson.encode({ status = "error", message = "Action không hợp lệ" }))
+end

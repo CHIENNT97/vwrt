@@ -1,0 +1,143 @@
+#!/usr/bin/lua
+
+-- Dynamic Path Resolution
+local source = debug.getinfo(1).source
+local script_path = source:match("@?(.*[/\\])")
+if script_path then
+    local cgi_root = script_path:match("(.*cgi%-bin/)")
+    if cgi_root then
+        package.path = cgi_root .. "?.lua;" .. package.path
+    end
+end
+if not package.path:find("/www/vwrt/cgi-bin") then
+    package.path = "/www/vwrt/cgi-bin/?.lua;/www/vwrt/?.lua;" .. package.path
+end
+
+local cjson = require "cjson"
+local csrf = require "lib.csrf"
+local constants = require "lib.constants"
+local sms_util = require "lib.sms_util"
+
+local ARCHIVE_FILE = constants.PATHS.SMS_ARCHIVE
+
+-- Helper functions
+function read_file(path)
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local content = f:read("*all")
+    f:close()
+    return content
+end
+
+function write_file(path, content)
+    local f = io.open(path, "w")
+    if f then
+        f:write(content)
+        f:close()
+        return true
+    end
+    return false
+end
+
+function load_archive()
+    local content = read_file(ARCHIVE_FILE)
+    if not content or content == "" then
+        return { settings = {}, conversations = {}, synced_ids = {} }
+    end
+    
+    local ok, archive = pcall(cjson.decode, content)
+    if ok and archive then
+        if not archive.synced_ids then archive.synced_ids = {} end
+        return archive
+    end
+    
+    return { settings = {}, conversations = {}, synced_ids = {} }
+end
+
+function save_archive(archive)
+    local json = cjson.encode(archive)
+    return write_file(ARCHIVE_FILE, json)
+end
+
+-- Helper to read request body
+function read_body()
+    local len = tonumber(os.getenv("CONTENT_LENGTH")) or 0
+    if len > 0 then
+        return io.read(len)
+    end
+    return nil
+end
+
+-- Helper to send JSON response
+function send_json(data)
+    print("Content-type: application/json\n")
+    print(cjson.encode(data))
+end
+
+local method = os.getenv("REQUEST_METHOD")
+
+if method == "POST" then
+    local body = read_body()
+    if not body then
+        send_json({ status = "error", message = "No content" })
+        return
+    end
+
+    local decode_status, req = pcall(cjson.decode, body)
+    if not decode_status or not req then
+        send_json({ status = "error", message = "Invalid JSON" })
+        return
+    end
+
+    -- Validate CSRF Token
+    if not csrf.validate_token(req.csrf_token) then
+        send_json({ status = "error", message = "Invalid CSRF Token" })
+        return
+    end
+
+    if req.action == "delete" and req.id then
+        local archive = load_archive()
+        local deleted_count = 0
+        
+        -- Delete from Router Archive only
+        for msg_id in string.gmatch(req.id, "([^,]+)") do
+            for phone, conv in pairs(archive.conversations) do
+                if conv.messages then
+                    for i = #conv.messages, 1, -1 do
+                        if conv.messages[i].id == msg_id then
+                            -- IMPORTANT: Keep the fingerprint in synced_ids!
+                            -- This prevents the sync service from re-adding it if it's still on the modem.
+                            if conv.messages[i].fingerprint then
+                                archive.synced_ids[conv.messages[i].fingerprint] = true
+                            end
+                            
+                            table.remove(conv.messages, i)
+                            deleted_count = deleted_count + 1
+                        end
+                    end
+                    
+                    -- Trigger background cleanup for this phone
+                    if deleted_count > 0 then
+                        pcall(function()
+                            local f_req = io.open("/tmp/sms_delete_request", "a")
+                            if f_req then f_req:write(phone .. "\n"); f_req:close() end
+                        end)
+                    end
+                    
+                    -- Clean up empty conversations
+                    if #conv.messages == 0 then
+                        archive.conversations[phone] = nil
+                    end
+                end
+            end
+        end
+        
+        save_archive(archive)
+        send_json({ status = "success", deleted = deleted_count })
+    else
+        send_json({ status = "error", message = "Invalid action" })
+    end
+
+else
+    send_json({ status = "error", message = "Method not allowed" })
+end

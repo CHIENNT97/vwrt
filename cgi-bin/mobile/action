@@ -1,0 +1,165 @@
+#!/usr/bin/lua
+
+-- Dynamic Path Resolution
+local source = debug.getinfo(1).source
+local script_path = source:match("@?(.*[\\/])")
+if script_path then
+    local cgi_root = script_path:match("(.*cgi%-bin/)")
+    if cgi_root then
+        package.path = cgi_root .. "?.lua;" .. package.path
+    end
+end
+if not package.path:find("/www/vwrt/cgi-bin") then
+    package.path = "/www/vwrt/cgi-bin/?.lua;" .. package.path
+end
+
+local cjson = require "cjson"
+local csrf = require "lib.csrf"
+local uci = require("luci.model.uci").cursor()
+
+os.execute("logger -t VWRT_ACTION 'Action script started'")
+
+print("Content-Type: application/json")
+print("") -- Extra newline to end headers
+
+local function send_response(status, message)
+    local resp = cjson.encode({ status = status, message = message })
+    print(resp)
+    io.flush()
+    os.execute("logger -t VWRT_ACTION 'Sent response: " .. status .. "'")
+end
+
+-- Helper to read body
+local function get_input()
+    local content_length = tonumber(os.getenv("CONTENT_LENGTH") or 0)
+    if content_length > 0 then
+        local raw = io.read(content_length)
+        return cjson.decode(raw)
+    end
+    return nil
+end
+
+-- Helper to check if file exists
+local function file_exists(path)
+    local f = io.open(path, "r")
+    if f then f:close() return true end
+    return false
+end
+
+-- Helper to resolve symlink
+local function resolve_link(path)
+    local handle = io.popen("/usr/bin/readlink -f " .. path)
+    local resolved = handle:read("*line")
+    handle:close()
+    return resolved
+end
+
+-- Helper to get parent directory
+local function get_parent_dir(path)
+    return path:match("(.*)/")
+end
+
+-- Helper to find USB Device Root (where idVendor exists)
+local function find_usb_root(path)
+    local curr = path
+    -- Traverse up max 6 levels to find idVendor
+    for i=1, 6 do
+        if not curr or curr == "" or curr == "/" then return nil end
+        if file_exists(curr .. "/idVendor") then
+            return curr
+        end
+        curr = get_parent_dir(curr)
+    end
+    return nil
+end
+
+-- Helper to find modem device using absolute paths
+local function find_modem_device()
+    -- Strategy 1: Look for cdc-wdm
+    local handle = io.popen("/bin/ls -d /sys/class/usbmisc/cdc-wdm* 2>/dev/null")
+    for line in handle:lines() do
+        local resolved = resolve_link(line)
+        if resolved then
+            local root = find_usb_root(resolved)
+            if root then 
+                handle:close()
+                return root 
+            end
+        end
+    end
+    handle:close()
+
+    -- Strategy 2: Look for ttyUSB
+    handle = io.popen("/bin/ls -d /sys/class/tty/ttyUSB* 2>/dev/null")
+    for line in handle:lines() do
+        local resolved = resolve_link(line)
+        if resolved then
+            local root = find_usb_root(resolved)
+            if root then 
+                handle:close()
+                return root 
+            end
+        end
+    end
+    handle:close()
+
+    return nil
+end
+
+-- Wrap everything in a pcall to ensure we always return valid JSON
+local ok, err_msg = pcall(function()
+    -- 1. Read Input (POST required)
+    local input = get_input()
+
+    -- 2. CSRF Check
+    local token = (input and input.csrf_token) or csrf.get_token_from_request()
+    if not csrf.validate_token(token) then
+        send_response("error", "CSRF Token khÃ´ng há»£p lá»‡!")
+        os.exit()
+    end
+
+    -- 3. Logic to Find and Activate Modem
+    local is_qmodem = (uci:get("qmodem", "main", "enable_dial") == "1")
+    if is_qmodem then
+        os.execute("logger -t VWRT_ACTION 'Resetting modem via QModem...'")
+        os.execute("/etc/init.d/qmodem restart >/dev/null 2>&1")
+        send_response("success", "Đã khởi động lại dịch vụ QModem để kích hoạt lại mạng.")
+        os.exit()
+    end
+
+    local target_iface = nil
+    uci:foreach("network", "interface", function(s)
+        if s.proto == "modemmanager" then
+            target_iface = s[".name"]
+            return false
+        end
+    end)
+
+    if not target_iface then
+        send_response("error", "Lá»—i: KhÃ´ng tÃ¬m tháº¥y Interface máº¡ng nÃ o dÃ¹ng ModemManager!")
+        os.exit()
+    end
+
+    local modem_dev = find_modem_device()
+    if not modem_dev then
+        send_response("error", "KhÃ´ng tÃ¬m tháº¥y Modem nÃ o Ä‘Æ°á»£c cáº¯m vÃ o.")
+        os.exit()
+    end
+
+    -- Execute Commands
+    os.execute("logger -t VWRT_ACTION 'Activating modem at " .. modem_dev .. " for interface " .. target_iface .. "'")
+    
+    uci:set("network", target_iface, "device", modem_dev)
+    uci:commit("network")
+
+    os.execute("ifdown " .. target_iface)
+    os.execute("/etc/init.d/modemmanager restart >/dev/null 2>&1")
+    os.execute("sleep 15 && ifup " .. target_iface .. " &")
+
+    send_response("success", "ÄÃ£ tÃ¬m tháº¥y Modem vÃ  kÃ­ch hoáº¡t láº¡i máº¡ng.")
+end)
+
+if not ok then
+    os.execute("logger -t VWRT_ACTION 'Critical Error: " .. tostring(err_msg) .. "'")
+    send_response("error", "Lá»—i há»‡ thá»‘ng: " .. tostring(err_msg))
+end

@@ -1,0 +1,119 @@
+#!/usr/bin/lua
+-- AdBlock Fast Status API
+-- Returns: { enabled: bool, lists: [{ name, enabled, size }] }
+
+local json = require("luci.jsonc")
+local uci = require("luci.model.uci").cursor()
+
+print("Content-Type: application/json; charset=utf-8")
+print("")
+
+local function get_status()
+    local result = {
+        enabled = false,
+        lists = {}
+    }
+    
+    -- Get global enabled status
+    local enabled = uci:get("adblock-fast", "config", "enabled")
+    result.enabled = (enabled == "1")
+
+    -- Get detailed status
+    local handle = io.popen("logread | grep 'adblock-fast' | grep 'blocking' | tail -n 1")
+    local log_line = handle:read("*a")
+    handle:close()
+
+    local version = "Unknown"
+    local blocked_domains = "0"
+    local dns_mode = "unknown"
+
+    -- Parse log line: [STAT] adblock-fast 1.2.0-r26 is blocking 373783 domains (with dnsmasq.servers)
+    if log_line and log_line ~= "" then
+        version = log_line:match("adblock%-fast ([%d%.%-r]+) is") or version
+        blocked_domains = log_line:match("blocking (%d+) domains") or blocked_domains
+        dns_mode = log_line:match("%(with ([^%)]+)%)") or dns_mode
+    end
+
+    -- FALLBACK: If logread failed (0 or Unknown), check the actual servers-file
+    if blocked_domains == "0" or blocked_domains == 0 then
+        local dns_type = uci:get("adblock-fast", "config", "dns")
+        if dns_type == "dnsmasq.servers" then
+            local h = io.popen("wc -l /var/run/adblock-fast/dnsmasq.servers 2>/dev/null | cut -d ' ' -f 1")
+            local count = h:read("*l")
+            h:close()
+            if count and count ~= "" then
+                blocked_domains = count
+                dns_mode = "dnsmasq.servers"
+            end
+        end
+    end
+    
+    -- If version not found in log, try opkg
+    if version == "Unknown" then
+        local h = io.popen("opkg list-installed adblock-fast | cut -d ' ' -f 3")
+        local v = h:read("*l")
+        h:close()
+        if v then version = v end
+    end
+
+    -- Get Force DNS Ports
+    local force_dns_ports = uci:get("adblock-fast", "config", "force_dns_port") or {}
+    -- Ensure it's a table (uci might return string if single value)
+    if type(force_dns_ports) == "string" then
+        force_dns_ports = { force_dns_ports }
+    end
+
+    result.status = {
+        version = version,
+        blocked_domains = blocked_domains,
+        dns_mode = dns_mode,
+        force_dns_ports = table.concat(force_dns_ports, " ")
+    }
+    
+    -- Helper: Generate name from URL
+    local function get_name_from_url(url)
+        if not url then return "Unknown" end
+        local lower = url:lower()
+        if lower:find("stevenblack") then return "StevenBlack Unified" end
+        if lower:find("adguardteam") then return "AdGuard CNAME" end
+        if lower:find("oisd.nl") then return "OISD Big" end
+        if lower:find("adaway") then return "AdAway" end
+        if lower:find("yoyo.org") then return "Yoyo" end
+        if lower:find("winhelp2002") then return "WinHelp2002" end
+        if lower:find("cameleon") then return "Cameleon" end
+        if lower:find("nocoin") then return "NoCoin" end
+        if lower:find("youtube_ads") then return "YouTube Ads" end
+        if lower:find("tracking") then return "Tracking List" end
+        
+        -- Fallback: Last segment of URL
+        local name = url:match(".+/([^/]+)$") or url
+        return name
+    end
+
+    -- Iterate through file_url sections to get lists
+    uci:foreach("adblock-fast", "file_url", function(s)
+        local derived_name = s.name
+        if not derived_name or derived_name == "" then
+            derived_name = get_name_from_url(s.url)
+        end
+        
+        -- If 'enabled' option is missing, it defaults to TRUE (1). Only explicit '0' is disabled.
+        local is_enabled = (s.enabled ~= "0")
+        
+        local list = {
+            name = derived_name,
+            enabled = is_enabled,
+            size = s.size or "0",
+            url = s.url or ""
+        }
+        table.insert(result.lists, list)
+    end)
+    
+    print(json.stringify(result))
+end
+
+-- Handle request
+local ok, err = pcall(get_status)
+if not ok then
+    print(json.stringify({ error = tostring(err) }))
+end

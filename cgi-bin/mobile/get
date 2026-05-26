@@ -1,0 +1,75 @@
+#!/usr/bin/lua
+
+-- Add parent /www/vwrt/ to package path for lib modules
+if not package.path:find("/www/vwrt") then
+    package.path = "/www/vwrt/?.lua;" .. package.path
+end
+
+local cjson = require "cjson"
+local constants = require "lib.constants"
+
+local cache_file = constants.PATHS.MOBILE_CACHE
+
+function read_file(path)
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local content = f:read("*all")
+    f:close()
+    return content
+end
+
+function get_data()
+    local content = read_file(cache_file)
+    local data = {}
+    
+    if content and content ~= "" then
+        local ok, parsed = pcall(cjson.decode, content)
+        if ok and parsed then
+            data = parsed
+        end
+    end
+
+    -- Dynamic WAN IP Extraction (No hardcoding)
+    local function get_wan_ip()
+        -- Priority interfaces (Cellular only for Modem Info)
+        local interfaces = {"5G", "wwan0", "4G"}
+        for _, ifname in ipairs(interfaces) do
+            local h = io.popen("ubus call network.interface." .. ifname .. " status 2>/dev/null")
+            if h then
+                local json = h:read("*all")
+                h:close()
+                if json and json ~= "" then
+                    local ok, st = pcall(cjson.decode, json)
+                    if ok and st and st["ipv4-address"] and st["ipv4-address"][1] then
+                        return st["ipv4-address"][1].address
+                    end
+                end
+            end
+        end
+        
+        -- Fallback: Check data.iface from cache
+        if data.iface then
+             local h = io.popen("ip -4 addr show " .. data.iface .. " 2>/dev/null | sed -n 's/.*inet \\([0-9.]*\\).*/\\1/p'")
+             if h then
+                 local ip = h:read("*l")
+                 h:close()
+                 if ip and ip ~= "" then return ip end
+             end
+        end
+
+        return "Unknown"
+    end
+    
+    data.wan_ip = get_wan_ip()
+
+    if not data.operator_name then
+        data.operator_name = "Loading..."
+        data.signal = "0"
+        data.mode = "Checking..."
+    end
+
+    return { status = "success", data = data }
+end
+
+print("Content-type: application/json\n\n")
+print(cjson.encode(get_data()))
